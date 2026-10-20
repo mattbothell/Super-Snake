@@ -242,9 +242,13 @@
   #sms {
     position: absolute; top: 6px; left: 6px; right: 6px; z-index: 6; pointer-events: none;
     background: var(--fg); color: #9eaa87; padding: 4px 7px 5px; border-radius: 2px;
-    font-size: 11px; line-height: 1.35; transform: translateY(-140%); transition: transform 0.35s steps(5);
+    font-size: 11px; line-height: 1.35; transform: translateY(-140%);
+    /* hidden until triggered; stays visible while sliding back up, then hides */
+    visibility: hidden; transition: transform 0.35s steps(5), visibility 0s 0.35s;
   }
-  #sms.show { transform: none; }
+  #sms.show { transform: none; visibility: visible; transition: transform 0.35s steps(5), visibility 0s; }
+  /* the message slides in from the top edge of the LCD, never over the bezel */
+  .theme-nokia #screen { overflow: hidden; }
   #sms .sms-from { display: flex; align-items: center; gap: 5px; font-weight: bold; }
   #sms .sms-from .art { width: 14px; height: 10px; color: #9eaa87; --art2: #9eaa87; }
   #pcload {
