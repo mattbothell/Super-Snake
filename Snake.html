@@ -1256,11 +1256,14 @@
   }
 
   function flashPcLoad() {
+    if (state !== "playing" && state !== "paused") return; // only ever inside a game, never on the menus
     const el = $("pcload");
     el.classList.remove("flash");
     void el.offsetWidth;
     el.classList.add("flash");
   }
+  // Clear the flash once it ends, so it can't replay when the CRT screen is shown again (e.g. switching themes).
+  $("pcload").addEventListener("animationend", () => $("pcload").classList.remove("flash"));
 
   // The poison apple always sits alongside at least one safe regular apple, and stays until eaten.
   function placePoison() {
@@ -1294,6 +1297,7 @@
   function showMenu() {
     clearInterval(timer);
     state = "menu";
+    $("pcload").classList.remove("flash");
     show("menu");
     refreshMenu();
   }
