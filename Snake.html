@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    --drop: 0 30px 60px rgba(0,0,0,0.6);
+    background: #0b0d10;
+    font-family: "Courier New", ui-monospace, Menlo, monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body.theme-nokia, body.theme-crt { background: radial-gradient(ellipse at 50% 40%, #2a2e35, #0e1013 70%); }
+  /* Inside the Mac app the window itself is the phone / monitor: no backdrop, system shadow instead of CSS. */
+  body.native { --drop: 0 0 0 transparent; }
+  body.native.theme-nokia, body.native.theme-crt { background: transparent; }
+  html:has(body.native), body.native { overflow: hidden; }
+
+  body:not(.theme-nokia) .nokia-only,
+  body:not(.theme-crt) .crt-only { display: none !important; }
+
+  #device { display: flex; flex-direction: column; align-items: center; position: relative; }
+  .case { position: relative; }
+
+  /* ---------- Screen contents (shared by every theme) ---------- */
+  #screen { position: relative; color: var(--fg); }
+  .theme-classic #screen {
+    --fg: #e8e8e8; --muted: #8a8a8a; --accent: #6ddb4c; --border: #2a2a2a;
+    --panel: #111; --overlay: rgba(0,0,0,0.78); --btn-fg: #000;
+  }
+  .theme-nokia #screen {
+    --fg: #1c2416; --muted: rgba(28,36,22,0.72); --accent: #1c2416; --border: #1c2416;
+    --panel: transparent; --overlay: rgba(158,170,135,0.97); --btn-fg: #9eaa87;
+  }
+  .theme-crt #screen {
+    --fg: var(--phosphor); --muted: color-mix(in srgb, var(--phosphor) 60%, transparent);
+    --accent: var(--phosphor); --border: color-mix(in srgb, var(--phosphor) 35%, transparent);
+    --panel: transparent; --overlay: rgba(0,0,0,0.72); --btn-fg: #000;
+    text-shadow: 0 0 calc(6px * var(--glow, 1)) color-mix(in srgb, var(--phosphor) 70%, transparent);
+  }
+
+  #app { width: min(640px, 100vw - 32px); }
+  .theme-nokia #app { width: 280px; }
+  .theme-crt #app { width: 420px; filter: blur(0.3px) saturate(1.2); }
+
+  #hud {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 10px 4px; font-size: 20px; font-weight: bold; letter-spacing: 1px;
+  }
+  #hud .label { color: var(--muted); font-size: 14px; margin-right: 6px; }
+  #hud .mode { color: var(--muted); font-size: 12px; }
+  .theme-nokia #hud { padding: 0 2px 4px; font-size: 15px; }
+  .theme-nokia #hud .label { font-size: 10px; }
+  .theme-nokia #hud .mode { display: none; }
+  .theme-crt #hud { padding: 6px 2px; font-size: 18px; }
+  .theme-crt #hud .label { font-size: 12px; }
+  .theme-crt #hud .mode { font-size: 11px; }
+
+  #board-wrap { position: relative; border: 3px solid var(--border); }
+  .theme-nokia #board-wrap { border: 2px solid var(--fg); }
+  .theme-crt #board-wrap { border-width: 2px; }
+  #board { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: safe center;
+    background: var(--overlay); text-align: center; padding: 16px; overflow-y: auto;
+  }
+  .theme-nokia .overlay { padding: 6px 8px; }
+  .theme-crt .overlay { padding: 10px 14px; }
+  .hidden { display: none !important; }
+
+  #title { width: min(320px, 70%); height: auto; margin-bottom: 10px; image-rendering: pixelated; }
+  .theme-nokia #title { width: 120px; margin-bottom: 3px; }
+  .theme-crt #title { width: 220px; margin-bottom: 6px; filter: drop-shadow(0 0 calc(6px * var(--glow, 1)) var(--phosphor)); }
+  h2 { font-size: 30px; margin: 0 0 8px; }
+  .theme-nokia h2 { font-size: 18px; margin-bottom: 4px; }
+  .theme-crt h2 { font-size: 26px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .theme-nokia .sub { font-size: 10px; margin-bottom: 6px; }
+  .theme-crt .sub { font-size: 12px; margin-bottom: 8px; }
+
+  .settings { width: 100%; max-width: 420px; text-align: left; }
+  .row { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; gap: 12px; }
+  .row > span { font-size: 14px; color: var(--muted); min-width: 90px; }
+  .theme-nokia .row { margin: 3px 0; gap: 6px; }
+  .theme-nokia .row > span { font-size: 10px; min-width: 50px; }
+  .theme-crt .row { margin: 5px 0; gap: 10px; }
+  .theme-crt .row > span { font-size: 13px; min-width: 76px; }
+  .theme-nokia .colors-row, .theme-nokia #resetRow { display: none; }
+
+  .seg { display: flex; gap: 6px; flex: 1; }
+  .seg button {
+    flex: 1; padding: 7px 0;
+    background: var(--panel); color: var(--fg);
+    border: 2px solid var(--border); border-radius: 4px;
+    font: inherit; font-size: 13px; cursor: pointer; text-shadow: inherit;
+  }
+  .seg button.on { border-color: var(--accent); color: var(--accent); }
+  .theme-nokia .seg { gap: 4px; }
+  .theme-nokia .seg button { padding: 2px 0; font-size: 10px; border-width: 1px; border-radius: 2px; font-weight: bold; }
+  .theme-nokia .seg button.on { background: var(--fg); color: var(--btn-fg); }
+  .theme-crt .seg button { padding: 5px 0; font-size: 12px; }
+  .theme-crt .seg button.on { box-shadow: 0 0 calc(8px * var(--glow, 1)) color-mix(in srgb, var(--phosphor) 60%, transparent); }
+
+  .colors { display: flex; gap: 14px; flex: 1; }
+  .colors label { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--muted); gap: 3px; flex: 1; }
+  input[type=color] { width: 100%; height: 30px; border: 2px solid var(--border); background: var(--panel); border-radius: 4px; padding: 1px; cursor: pointer; }
+  .theme-crt input[type=color] { height: 24px; }
+  details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .theme-nokia details { margin-top: 6px; padding-top: 4px; }
+  .theme-nokia summary { font-size: 10px; }
+  .theme-crt details { margin-top: 8px; padding-top: 6px; }
+  .theme-crt summary { font-size: 12px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  #appleCountLabel { min-width: 24px; text-align: right; }
+
+  .btn {
+    margin-top: 16px; padding: 10px 28px;
+    background: var(--accent); color: var(--btn-fg); border: none; border-radius: 4px;
+    font: inherit; font-weight: bold; font-size: 16px; letter-spacing: 2px; cursor: pointer; text-shadow: none;
+  }
+  .btn.secondary { background: transparent; color: var(--fg); border: 2px solid var(--border); margin-left: 8px; }
+  .theme-nokia .btn { margin-top: 6px; padding: 4px 16px; font-size: 12px; border-radius: 2px; }
+  .theme-nokia .btn.secondary { border-width: 1px; }
+  .theme-crt .btn { margin-top: 10px; padding: 7px 22px; font-size: 14px; box-shadow: 0 0 calc(14px * var(--glow, 1)) var(--phosphor); }
+  .link { background: none; border: none; color: var(--muted); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 10px; }
+  .help { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+  .theme-nokia .help, .theme-crt .help { display: none; }
+  .final { margin-bottom: 0; }
+  .newbest { color: #ffd23f; font-weight: bold; margin-bottom: 6px; }
+  .theme-nokia .newbest { color: var(--fg); font-size: 11px; animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 50% { visibility: hidden; } }
+  #menuHighLine { margin: 12px 0 0; }
+  .theme-nokia #menuHighLine { margin: 4px 0 0; }
+  .theme-crt #menuHighLine { margin: 6px 0 0; }
+
+  /* ---------- Super Snake ---------- */
+  .note { color: var(--muted); font-size: 11px; text-align: right; margin-top: -4px; }
+  .theme-nokia .note { font-size: 9px; margin-top: -2px; }
+  body:not(.mode-super) #superApplesNote { display: none; }
+  input[type=range]:disabled { opacity: 0.4; }
+  #shieldIcon { display: inline-block; width: 0.85em; height: 0.85em; margin-left: 8px; vertical-align: -0.08em; }
+  #shieldIcon svg { display: block; width: 100%; height: 100%; fill: #ff5a5a; animation: rainbow 2s linear infinite, pulse 1.2s ease-in-out infinite; }
+  #shieldIcon.hidden { display: none; }
+  @keyframes rainbow { to { filter: hue-rotate(360deg); } }
+  @keyframes pulse { 50% { opacity: 0.6; } }
+  #toast {
+    position: absolute; top: 10%; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none;
+    padding: 4px 12px; white-space: nowrap; font-size: 16px; font-weight: bold; letter-spacing: 2px;
+    color: var(--fg); background: var(--overlay); border: 2px solid var(--accent); border-radius: 4px;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  #toast.show { opacity: 1; transition: none; }
+  .theme-nokia #toast { font-size: 11px; padding: 2px 6px; border-width: 1px; }
+
+  /* ---------- Locks & achievements ---------- */
+  .lock-ico { display: inline-block; width: 0.9em; height: 0.9em; vertical-align: -0.1em; fill: currentColor; }
+  .seg button.locked { opacity: 0.45; cursor: not-allowed; }
+  .seg button.locked .lock-ico { margin-right: 3px; }
+  .locked-note { flex: 1; color: var(--muted); font-size: 12px; }
+  .colors-row.is-locked .colors { display: none; }
+  .colors-row:not(.is-locked) .locked-note { display: none; }
+  .lock-btn {
+    position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 5px;
+    background: var(--panel); color: var(--fg); border: 2px solid var(--border); border-radius: 6px; cursor: pointer;
+  }
+  .lock-btn svg { width: 100%; height: 100%; fill: currentColor; display: block; }
+  .lock-btn.unlocked { color: var(--accent); border-color: var(--accent); }
+  .theme-nokia .lock-btn { top: 4px; right: 4px; width: 20px; height: 20px; padding: 2px; border-width: 1px; }
+  .theme-crt .lock-btn { top: 6px; right: 6px; width: 26px; height: 26px; }
+  .theme-nokia #menu .btn.secondary { margin-left: 4px; }
+
+  .ach-tree { width: 100%; max-width: 460px; text-align: left; margin-bottom: 4px; }
+  .ach-root { margin: 6px 0 10px; }
+  .ach-root > .ach-head { font-weight: bold; font-size: 15px; letter-spacing: 2px; color: var(--accent); }
+  .ach-root.locked > .ach-head { color: var(--muted); }
+  .ach-root > .ach-head small { font-weight: normal; letter-spacing: 0; color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .ach-list { list-style: none; margin: 2px 0 0 6px; padding: 0 0 0 14px; border-left: 1px dashed var(--border); }
+  .ach-list li { position: relative; padding: 4px 0 4px 6px; }
+  .ach-list li::before { content: ""; position: absolute; left: -14px; top: 12px; width: 16px; border-top: 1px dashed var(--border); }
+  .ach-name { font-weight: bold; font-size: 13px; }
+  .ach-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .ach-reward { font-size: 11px; margin-top: 1px; }
+  .ach-list li.earned > .ach-name { color: var(--accent); }
+  .ach-list li.locked > .ach-name, .ach-list li.locked > .ach-reward { opacity: 0.5; }
+  .ach-mark { display: inline-block; width: 1.2em; }
+  .theme-nokia .ach-root > .ach-head { font-size: 11px; letter-spacing: 1px; }
+  .theme-nokia .ach-name { font-size: 10px; }
+  .theme-nokia .ach-desc, .theme-nokia .ach-reward, .theme-nokia .locked-note { font-size: 9px; }
+  .theme-nokia .ach-list { padding-left: 10px; }
+  .theme-nokia .ach-list li::before { left: -10px; width: 12px; }
+  #toast small { display: block; font-size: 0.75em; font-weight: normal; letter-spacing: 1px; margin-top: 2px; }
+
+  /* ---------- Window controls (Mac app, device themes) ---------- */
+  .winctl { display: none; position: absolute; gap: 7px; z-index: 20; opacity: 0; transition: opacity 0.15s; }
+  body.native:not(.theme-classic) .winctl { display: flex; }
+  .case:hover .winctl { opacity: 1; }
+  .winctl button { width: 13px; height: 13px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.3); padding: 0; cursor: pointer; }
+  .winctl [data-win=close] { background: #ff5f57; }
+  .winctl [data-win=minimize] { background: #febc2e; }
+  .theme-nokia .winctl { top: 40px; left: 58px; }
+  .theme-crt .winctl { top: 14px; left: 16px; }
+
+  /* ---------- Nokia 3310 ---------- */
+  /* The body is an SVG drawn to the phone's real outline; the screen and keys sit on top at fixed positions. */
+  .theme-nokia .case { width: 440px; height: 780px; }
+  .nokia-body { position: absolute; inset: 0; display: block; filter: drop-shadow(var(--drop)); }
+  .theme-nokia #bezel {
+    position: absolute; left: 66px; top: 98px; width: 308px; padding: 8px;
+    background: linear-gradient(#171a22, #06070b);
+    border-radius: 14px 14px 20px 20px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(0,0,0,0.75), 0 1px 0 1px rgba(255,255,255,0.07);
+  }
+  /* glare on the screen glass */
+  .theme-nokia #bezel::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 5;
+    background: linear-gradient(118deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.04) 34%, transparent 34.5%, transparent 100%);
+  }
+  .theme-nokia #screen {
+    padding: 6px; border-radius: 4px;
+    background: linear-gradient(170deg, #aab595 0%, #9eaa87 55%, #8f9b7a 100%);
+    box-shadow: inset 0 2px 7px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.45);
+  }
+  .theme-nokia .keypad { position: absolute; inset: 0; pointer-events: none; }
+  .nk-key {
+    position: absolute; pointer-events: auto; cursor: pointer;
+    transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+    width: 66px; height: 30px; border: none; border-radius: 50%; padding: 0;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font: 700 15px/1 "Helvetica Neue", Arial, sans-serif; color: #17140c;
+    background: radial-gradient(ellipse at 42% 22%, #fdf7dc 0%, #e6d9a6 32%, #cbbb7d 70%, #a9985d 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -2px 3px rgba(90,70,25,0.45),
+                0 1px 0 rgba(0,0,0,0.85), 0 3px 5px rgba(0,0,0,0.6);
+  }
+  .nk-key small { font-size: 9px; font-weight: 600; letter-spacing: 0.3px; }
+  .nk-key:active {
+    transform: translate(-50%, -50%) rotate(var(--r, 0deg)) translateY(1px);
+    filter: brightness(0.94);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.7), inset 0 -1px 2px rgba(90,70,25,0.45), 0 1px 2px rgba(0,0,0,0.6);
+  }
+  .nk-key.soft { width: 58px; height: 20px; }
+  .nk-key.soft::after { content: ""; width: 22px; height: 2px; border-radius: 1px; background: #3d3624; }
+  .nk-key.rock-up { width: 64px; height: 24px; border-radius: 50% 50% 38% 38% / 75% 75% 25% 25%; }
+  .nk-key.rock-down { width: 56px; height: 22px; border-radius: 38% 38% 50% 50% / 25% 25% 75% 75%; }
+  .nk-key.call { width: 60px; height: 24px; }
+  .nk-key svg { display: block; }
+
+  /* ---------- CRT monitor ---------- */
+  .theme-crt .case {
+    width: 780px; padding: 34px 40px 18px;
+    background: linear-gradient(175deg, #ece5d2 0%, #d8cfb7 55%, #c5bba1 100%);
+    border-radius: 22px 22px 16px 16px;
+    box-shadow: inset 0 2px 2px rgba(255,255,255,0.75), inset 0 -4px 10px rgba(0,0,0,0.18), var(--drop);
+  }
+  .theme-crt #bezel {
+    padding: 26px; border-radius: 30px;
+    background: linear-gradient(#d0c7ae, #bcb297);
+    box-shadow: inset 0 5px 12px rgba(0,0,0,0.35), inset 0 -2px 2px rgba(255,255,255,0.5);
+  }
+  .theme-crt #screen {
+    width: 648px; height: 486px; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 45%,
+      color-mix(in srgb, var(--phosphor) 7%, var(--crtbg, #070908)) 0%,
+      color-mix(in srgb, var(--crtbg, #040504) 65%, #000) 75%);
+    border-radius: 38px / 44px; overflow: hidden;
+    box-shadow: 0 0 0 3px #2b2a26, 0 0 0 5px #9d947c;
+  }
+  .crt-overlay {
+    position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 10; overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0,0,0,0.55) 100%),
+      linear-gradient(155deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 28%, transparent 42%);
+    box-shadow: inset 0 0 90px rgba(0,0,0,0.9), inset 0 0 22px rgba(0,0,0,0.8);
+  }
+  .crt-overlay i { position: absolute; inset: 0; display: block; }
+  .crt-overlay .scan {
+    background:
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 3px),
+      repeating-linear-gradient(to right, rgba(255,40,40,0.06) 0 1px, rgba(40,255,40,0.04) 1px 2px, rgba(40,90,255,0.06) 2px 3px);
+  }
+  .crt-overlay .grain {
+    inset: -50%; opacity: 0.08;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation: grain 0.5s steps(5) infinite;
+  }
+  .crt-overlay .roll {
+    inset: auto 0; top: -30%; height: 30%;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.045) 50%, transparent);
+    animation: roll 8s linear infinite;
+  }
+  .crt-overlay .flicker { background: rgba(255,255,255,0.04); animation: flicker 0.13s infinite; }
+  @keyframes grain {
+    0% { transform: translate(0, 0); } 20% { transform: translate(-8%, 4%); } 40% { transform: translate(6%, -6%); }
+    60% { transform: translate(-4%, 8%); } 80% { transform: translate(8%, 2%); } 100% { transform: translate(0, 0); }
+  }
+  @keyframes roll { to { top: 110%; } }
+  @keyframes flicker {
+    0% { opacity: 0.2; } 10% { opacity: 0.8; } 20% { opacity: 0.35; } 30% { opacity: 0.9; } 40% { opacity: 0.15; }
+    50% { opacity: 0.7; } 60% { opacity: 0.4; } 70% { opacity: 1; } 80% { opacity: 0.25; } 90% { opacity: 0.6; } 100% { opacity: 0.3; }
+  }
+  .theme-crt #screen.booting #app { animation: crt-on 0.7s ease-out; }
+  .theme-crt #screen.off #app { animation: crt-off 0.35s ease-in forwards; }
+  @keyframes crt-on {
+    0% { transform: scale(0.02, 0.004); filter: brightness(6); }
+    35% { transform: scale(1, 0.004); filter: brightness(4); }
+    70% { transform: scale(1, 1); filter: brightness(1.6) blur(0.3px); }
+    100% { transform: none; filter: blur(0.3px) saturate(1.2); }
+  }
+  @keyframes crt-off {
+    0% { transform: none; }
+    55% { transform: scale(1, 0.004); filter: brightness(5); }
+    100% { transform: scale(0, 0.004); filter: brightness(8); opacity: 0; }
+  }
+  .crt-panel { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 4px; }
+  .crt-brand {
+    font: italic 800 16px "Helvetica Neue", Arial, sans-serif; letter-spacing: 4px; color: #8d8470;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .crt-brand small { font-style: normal; font-weight: 600; font-size: 10px; letter-spacing: 2px; margin-left: 8px; }
+  .crt-controls { display: flex; gap: 14px; align-items: center; }
+  .knob {
+    position: relative; width: 22px; height: 22px; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, #f5f0e2, #a39a82);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.35), inset 0 -1px 2px rgba(0,0,0,0.3);
+  }
+  .knob:active { transform: scale(0.94); box-shadow: 0 1px 2px rgba(0,0,0,0.35), inset 0 -1px 2px rgba(0,0,0,0.3); }
+  /* indicator line, rotated to show the knob's setting */
+  .knob::after {
+    content: ""; position: absolute; left: 10px; top: 3px; width: 2px; height: 7px; border-radius: 1px;
+    background: #6e6754; transform-origin: 1px 8px; transform: rotate(var(--rot, 0deg)); transition: transform 0.15s;
+  }
+  #osd {
+    position: absolute; top: 30px; left: 52px; z-index: 8; pointer-events: none;
+    font-size: 15px; font-weight: bold; letter-spacing: 2px; color: var(--phosphor);
+    background: rgba(0,0,0,0.88); padding: 3px 8px; border: 1px solid var(--phosphor);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  #osd.show { opacity: 1; transition: none; }
+  /* flicker levels set by the knob: 0 off … 3 high */
+  #screen[data-flicker="0"] .crt-overlay .flicker { display: none; }
+  #screen[data-flicker="1"] .crt-overlay .flicker { background: rgba(255,255,255,0.02); }
+  #screen[data-flicker="3"] .crt-overlay .flicker { background: rgba(255,255,255,0.1); }
+  #screen[data-flicker="0"] .crt-overlay .roll { display: none; }
+  #screen[data-flicker="3"] .crt-overlay .roll { background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.08) 50%, transparent); animation-duration: 5s; }
+  .power {
+    width: 36px; height: 20px; border-radius: 4px; border: none; cursor: pointer; margin-left: 8px;
+    background: linear-gradient(#efe9da, #c2b99f); box-shadow: 0 2px 0 #8f866e, 0 3px 4px rgba(0,0,0,0.3);
+  }
+  .power:active { transform: translateY(1px); box-shadow: 0 1px 0 #8f866e; }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: #3cff5a; box-shadow: 0 0 6px #3cff5a, 0 0 12px rgba(60,255,90,0.6); }
+  body.crt-off .led { background: #2d4a31; box-shadow: none; }
+  .crt-stand { display: flex; flex-direction: column; align-items: center; }
+  .crt-stand .neck {
+    width: 260px; height: 26px; background: linear-gradient(#c9c0a6, #ada389);
+    clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  }
+  .crt-stand .base {
+    width: 440px; height: 22px; border-radius: 10px 10px 30px 30px / 10px 10px 16px 16px;
+    background: linear-gradient(#e0d8c3, #b5ab90);
+    box-shadow: inset 0 2px 1px rgba(255,255,255,0.6), var(--drop);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .crt-overlay i { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="device">
+  <div class="case">
+    <div class="winctl"><button data-win="close" title="Close"></button><button data-win="minimize" title="Minimize"></button></div>
+    <svg class="nokia-body nokia-only" viewBox="0 0 440 780" width="440" height="780" aria-hidden="true">
+      <defs>
+        <path id="nkOutline" d="M220 6 C318 6 432 16 434 120 L431 400 C430 520 433 640 431 690 C429 752 350 774 220 774 C90 774 11 752 9 690 C7 640 10 520 9 400 L6 120 C8 16 122 6 220 6 Z"/>
+        <path id="nkBandPath" d="M70 34 C120 22 320 22 370 34 C405 44 416 70 416 110 L414 400 C413 440 400 470 330 520 L255 572 C240 582 200 582 185 572 L110 520 C40 470 27 440 26 400 L24 110 C24 70 35 44 70 34 Z"/>
+        <path id="nkFacePath" d="M80 48 C130 37 310 37 360 48 C392 57 402 80 402 112 L400 398 C399 432 388 458 322 504 L250 554 C236 563 204 563 190 554 L118 504 C52 458 41 432 40 398 L38 112 C38 80 48 57 80 48 Z"/>
+        <clipPath id="nkClip"><use href="#nkOutline"/></clipPath>
+        <linearGradient id="nkBody" x1="0" x2="1">
+          <stop offset="0" stop-color="#090b10"/><stop offset="0.05" stop-color="#222837"/>
+          <stop offset="0.17" stop-color="#3a4256"/><stop offset="0.4" stop-color="#323a4c"/>
+          <stop offset="0.72" stop-color="#2a3142"/><stop offset="0.93" stop-color="#1b202c"/>
+          <stop offset="1" stop-color="#08090d"/>
+        </linearGradient>
+        <linearGradient id="nkShade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.12"/><stop offset="0.14" stop-color="#fff" stop-opacity="0"/>
+          <stop offset="0.85" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.4"/>
+        </linearGradient>
+        <linearGradient id="nkBand" x1="0" x2="1">
+          <stop offset="0" stop-color="#6b6862"/><stop offset="0.06" stop-color="#d8d5cd"/>
+          <stop offset="0.14" stop-color="#b9b5ac"/><stop offset="0.3" stop-color="#eeede8"/>
+          <stop offset="0.5" stop-color="#c7c4bc"/><stop offset="0.7" stop-color="#f1f0eb"/>
+          <stop offset="0.86" stop-color="#b4b0a7"/><stop offset="0.94" stop-color="#dad7cf"/>
+          <stop offset="1" stop-color="#6a6761"/>
+        </linearGradient>
+        <linearGradient id="nkFace" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#363d50"/><stop offset="0.5" stop-color="#262c3a"/><stop offset="1" stop-color="#1b202b"/>
+        </linearGradient>
+        <linearGradient id="nkLogo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f6f7f9"/><stop offset="0.55" stop-color="#cfd2d8"/><stop offset="1" stop-color="#a2a6ae"/>
+        </linearGradient>
+        <!-- fine plastic grain -->
+        <filter id="nkGrain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" stitchTiles="stitch"/>
+          <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.09 0"/>
+          <feComposite in2="SourceGraphic" operator="in"/>
+        </filter>
+        <filter id="nkBlur" x="-50%" y="-10%" width="200%" height="120%"><feGaussianBlur stdDeviation="7"/></filter>
+      </defs>
+
+      <!-- body -->
+      <use href="#nkOutline" fill="url(#nkBody)"/>
+      <use href="#nkOutline" fill="url(#nkShade)"/>
+      <use href="#nkOutline" fill="#fff" filter="url(#nkGrain)"/>
+      <g clip-path="url(#nkClip)">
+        <ellipse cx="40" cy="390" rx="14" ry="340" fill="#fff" opacity="0.09" filter="url(#nkBlur)"/>
+        <ellipse cx="404" cy="390" rx="9" ry="330" fill="#fff" opacity="0.05" filter="url(#nkBlur)"/>
+        <ellipse cx="220" cy="10" rx="150" ry="10" fill="#fff" opacity="0.12" filter="url(#nkBlur)"/>
+      </g>
+      <use href="#nkOutline" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1.2"/>
+
+      <!-- silver band -->
+      <use href="#nkBandPath" fill="url(#nkBand)" stroke="#000" stroke-opacity="0.45" stroke-width="1"/>
+      <use href="#nkBandPath" fill="url(#nkShade)"/>
+
+      <!-- faceplate -->
+      <use href="#nkFacePath" fill="url(#nkFace)" stroke="#000" stroke-opacity="0.6" stroke-width="1.5"/>
+      <use href="#nkFacePath" fill="#fff" filter="url(#nkGrain)"/>
+      <path d="M86 52 C135 42 305 42 354 52" fill="none" stroke="#fff" stroke-opacity="0.1" stroke-width="1.2"/>
+
+      <!-- speaker grille -->
+      <g fill="#07080c">
+        <circle cx="220" cy="54" r="2.1"/><circle cx="220" cy="61" r="2.1"/>
+        <circle cx="220" cy="68" r="2.1"/><circle cx="220" cy="75" r="2.1"/>
+      </g>
+
+      <!-- NOKIA wordmark -->
+      <svg x="178" y="80" width="84" height="17.3" viewBox="0 0 485 100">
+        <g fill="url(#nkLogo)" fill-rule="evenodd">
+          <polygon points="0,100 0,0 30,0 73,62 73,0 100,0 100,100 70,100 27,38 27,100"/>
+          <path d="M110 50 A55 50 0 1 0 220 50 A55 50 0 1 0 110 50 Z M138 50 A27 31 0 1 1 192 50 A27 31 0 1 1 138 50 Z"/>
+          <polygon points="230,0 257,0 257,42 290,0 324,0 282,50 326,100 291,100 257,60 257,100 230,100"/>
+          <rect x="336" y="0" width="27" height="100"/>
+          <path d="M373 100 L413 0 L445 0 L485 100 L456 100 L449 80 L409 80 L402 100 Z M416 58 L442 58 L429 22 Z"/>
+        </g>
+      </svg>
+    </svg>
+
+    <div id="bezel">
+      <div id="screen">
+        <div id="app">
+          <div id="hud">
+            <div><span class="label">SCORE</span><span id="score">0</span><span id="shieldIcon" class="hidden" title="Shield active"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.2 3.4 9.5 8 11 4.6-1.5 8-5.8 8-11V5z"/></svg></span></div>
+            <div class="mode" id="mode"></div>
+            <div><span class="label">HIGH</span><span id="high">0</span></div>
+          </div>
+
+          <div id="board-wrap">
+            <canvas id="board" width="600" height="600"></canvas>
+            <div id="toast"></div>
+
+            <!-- Menu -->
+            <div class="overlay" id="menu">
+              <button class="lock-btn" id="lockBtn"></button>
+              <canvas id="title" aria-label="SNAKE"></canvas>
+              <div class="sub" id="controlsHint"></div>
+              <div class="settings">
+                <div class="row"><span>Game Mode</span>
+                  <div class="seg" data-setting="mode">
+                    <button data-v="normal">Normal</button><button data-v="super">Super Snake</button>
+                  </div>
+                </div>
+                <div class="row"><span>Theme</span>
+                  <div class="seg" data-setting="theme">
+                    <button data-v="classic">Classic</button><button data-v="nokia">Nokia</button><button data-v="crt">CRT</button>
+                  </div>
+                </div>
+                <div class="row colors-row"><span>Colors</span>
+                  <div class="colors">
+                    <label><input type="color" id="cBg">Background</label>
+                    <label><input type="color" id="cSnake">Snake</label>
+                    <label><input type="color" id="cApple">Apple</label>
+                  </div>
+                  <div class="locked-note" id="colorsLocked"></div>
+                </div>
+                <details>
+                  <summary>Extra settings</summary>
+                  <div class="row"><span>Size</span>
+                    <div class="seg" data-setting="size">
+                      <button data-v="small">Small</button><button data-v="medium">Medium</button><button data-v="large">Large</button>
+                    </div>
+                  </div>
+                  <div class="row"><span>Speed</span>
+                    <div class="seg" data-setting="speed">
+                      <button data-v="slow">Slow</button><button data-v="medium">Medium</button><button data-v="fast">Fast</button>
+                    </div>
+                  </div>
+                  <div class="row"><span>Apples</span>
+                    <input type="range" id="appleCount" min="1" max="10" step="1">
+                    <span id="appleCountLabel"></span>
+                  </div>
+                  <div class="note" id="superApplesNote">Super Snake always uses 1 apple</div>
+                  <div class="row" id="resetRow" style="justify-content:flex-end">
+                    <button class="link" id="resetColors">Reset colors to default</button>
+                  </div>
+                </details>
+              </div>
+              <div class="sub" id="menuHighLine">High score for these settings: <b id="menuHigh">0</b></div>
+              <div>
+                <button class="btn" id="startBtn">START</button>
+                <button class="btn secondary" id="achBtn">ACHIEVEMENTS</button>
+              </div>
+              <div class="help">Press Enter to start</div>
+            </div>
+
+            <!-- Achievements -->
+            <div class="overlay hidden" id="achievements">
+              <h2>ACHIEVEMENTS</h2>
+              <div class="sub" id="achCount"></div>
+              <div class="ach-tree" id="achTree"></div>
+              <button class="btn secondary" id="achBack">BACK</button>
+            </div>
+
+            <!-- Pause -->
+            <div class="overlay hidden" id="paused">
+              <h2>PAUSED</h2>
+              <div class="sub" id="pauseHint"></div>
+            </div>
+
+            <!-- Game over -->
+            <div class="overlay hidden" id="over">
+              <h2>GAME OVER</h2>
+              <div class="newbest hidden" id="newBest">NEW HIGH SCORE!</div>
+              <div class="sub">Score: <b id="finalScore">0</b> · High: <b id="finalHigh">0</b></div>
+              <div>
+                <button class="btn" id="againBtn">PLAY AGAIN</button>
+                <button class="btn secondary" id="menuBtn">MENU</button>
+              </div>
+              <div class="help">Enter to play again · Esc for menu</div>
+            </div>
+          </div>
+        </div>
+        <div id="osd" class="crt-only"></div>
+        <div class="crt-overlay crt-only"><i class="scan"></i><i class="grain"></i><i class="roll"></i><i class="flicker"></i></div>
+      </div>
+    </div>
+
+    <div class="crt-panel crt-only">
+      <div class="crt-brand">SNAKETRON<small>14" COLOR</small></div>
+      <div class="crt-controls">
+        <button class="knob" id="knobFlicker" title="Flicker"></button>
+        <button class="knob" id="knobColor" title="Color"></button>
+        <button class="knob" id="knobGlow" title="Glow"></button>
+        <button class="power" id="power" title="Power"></button>
+        <span class="led"></span>
+      </div>
+    </div>
+
+    <!-- Keys sit at fixed spots on the body: soft keys + rocker inside the band, call keys outside it, then the fanned numpad. -->
+    <div class="keypad nokia-only">
+      <button class="nk-key soft" data-act="escape" title="Menu" style="left:118px;top:458px;--r:-14deg"></button>
+      <button class="nk-key soft" data-act="select" title="Select" style="left:322px;top:458px;--r:14deg"></button>
+      <button class="nk-key rock-up" data-act="up" style="left:220px;top:456px">
+        <svg width="18" height="10" viewBox="0 0 18 10"><polyline points="2,8 9,2 16,8" fill="none" stroke="#2b2516" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="nk-key rock-down" data-act="down" style="left:220px;top:486px">
+        <svg width="18" height="10" viewBox="0 0 18 10"><polyline points="2,2 9,8 16,2" fill="none" stroke="#2b2516" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="nk-key call" data-act="select" title="Start / pause" style="left:62px;top:552px;--r:26deg">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#1f8a2e" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+      </button>
+      <button class="nk-key call" data-act="escape" title="Menu" style="left:378px;top:552px;--r:-26deg">
+        <svg width="18" height="18" viewBox="0 0 24 24" style="transform:rotate(135deg)"><path fill="#c42020" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+      </button>
+
+      <button class="nk-key" style="left:112px;top:600px;--r:-8deg">1<small>○○</small></button>
+      <button class="nk-key" data-act="up" style="left:220px;top:604px">2<small>abc</small></button>
+      <button class="nk-key" style="left:328px;top:600px;--r:8deg"><small>def</small>3</button>
+      <button class="nk-key" data-act="left" style="left:112px;top:642px;--r:-8deg">4<small>ghi</small></button>
+      <button class="nk-key" data-act="select" style="left:220px;top:646px">5<small>jkl</small></button>
+      <button class="nk-key" data-act="right" style="left:328px;top:642px;--r:8deg"><small>mno</small>6</button>
+      <button class="nk-key" style="left:112px;top:684px;--r:-8deg">7<small>pqrs</small></button>
+      <button class="nk-key" data-act="down" style="left:220px;top:688px">8<small>tuv</small></button>
+      <button class="nk-key" style="left:328px;top:684px;--r:8deg"><small>wxyz</small>9</button>
+      <button class="nk-key" style="left:112px;top:726px;--r:-8deg">*<small>+</small></button>
+      <button class="nk-key" style="left:220px;top:730px">0<small>⎵</small></button>
+      <button class="nk-key" style="left:328px;top:726px;--r:8deg"><small>⇧</small>#</button>
+    </div>
+  </div>
+  <div class="crt-stand crt-only"><div class="neck"></div><div class="base"></div></div>
+</div>
+
+<script>
+(() => {
+  const SIZES  = { small: 15, medium: 20, large: 30 };            // cells per side
+  const SPEEDS = { slow: 140, medium: 95, fast: 60 };             // ms per step
+  const THEMES = ["classic", "nokia", "crt"];
+  const NOKIA = { bg: "#9eaa87", fg: "#1c2416" };
+  const DEFAULTS = { theme: "classic", size: "medium", speed: "medium", bg: "#000000", snake: "#6ddb4c", apple: "#e83a3a", apples: 1, crtFlicker: 2, crtScheme: 0, crtGlow: 4, mode: "normal", unlockAll: true };
+  // Super Snake: each apple eaten has a 10% chance of a power-up star, and (separately) a 4% chance of a shield star.
+  const POWER_CHANCE = 0.10, SHIELD_CHANCE = 0.04;
+  const POWERS = ["near", "line", "four", "big"];
+  const POWER_TOASTS = { near: "NEXT 5 APPLES NEARBY", line: "APPLES IN A ROW", four: "+4 APPLES", big: "BIG APPLE!" };
+  const NEAR_COUNT = 5, NEAR_RADIUS = 7;
+  // "personal" shows the lock/unlock button; "locked" (the public Super Snake edition) makes every customization earned.
+  const EDITION = "locked";
+
+  // ---------- Achievements ----------
+  // Trees branch by `requires`: an achievement can only be earned once the one it requires is earned,
+  // and a whole tree opens once its own `requires` is earned. `hidden: true` shows the name only.
+  // `unlocks` names the customization it unlocks (see UNLOCK_NAMES).
+  const TREES = [
+    { id: "classic", name: "CLASSIC" },
+    { id: "super", name: "SUPER SNAKE", requires: "fast-50" },
+  ];
+  const ACHIEVEMENTS = [
+    { id: "getting-started", tree: "classic", name: "Getting Started", desc: "Score 100 in the default game mode", unlocks: "theme:nokia" },
+    { id: "fast-50", tree: "classic", requires: "getting-started", name: "Fast 50", desc: "Score 50 on a small field with a fast snake", unlocks: "theme:crt" },
+    { id: "lazy-day", tree: "classic", requires: "fast-50", name: "Lazy Day", desc: "Score 150 on a large field with a slow snake", unlocks: "colors" },
+    { id: "five-on-it", tree: "super", name: "I got 5 on it", desc: "Collect 5 power-ups uninterrupted", unlocks: "crt:1" },
+    { id: "insatiable", tree: "super", name: "Insatiable", desc: "Collect 3 big apples in a row", unlocks: "crt:2" },
+    { id: "patience", tree: "super", name: "Patience is a virtue", desc: "Score 75 without collecting any power-ups", unlocks: "crt:3" },
+  ];
+  const UNLOCK_NAMES = {
+    "theme:nokia": "Nokia theme", "theme:crt": "CRT theme", colors: "Color customization",
+    "crt:1": "Amber CRT colors", "crt:2": "Paper White CRT colors", "crt:3": "Navy CRT colors",
+  };
+  const LOCK_SVG = '<svg class="lock-ico" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>';
+  const UNLOCK_SVG = '<svg class="lock-ico" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 9.9-1h-2.1A3 3 0 0 0 9 7v3h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z"/></svg>';
+
+  // 5x5 pixel font for titles
+  const FONT = {
+    S: ["01111", "10000", "01110", "00001", "11110"],
+    N: ["10001", "11001", "10101", "10011", "10001"],
+    A: ["01110", "10001", "11111", "10001", "10001"],
+    K: ["10001", "10010", "11100", "10010", "10001"],
+    E: ["11111", "10000", "11110", "10000", "11111"],
+    U: ["10001", "10001", "10001", "10001", "01110"],
+    P: ["11110", "10001", "11110", "10000", "10000"],
+    R: ["11110", "10001", "11110", "10010", "10001"],
+  };
+  // CRT color knob: scheme 0 uses the player's own colors.
+  const CRT_SCHEMES = [
+    { name: "STANDARD" },
+    { name: "AMBER", bg: "#0c0700", snake: "#ffb000", apple: "#ff6a1a" },
+    { name: "PAPER WHITE", bg: "#05070a", snake: "#e8eeff", apple: "#8fb0ff" },
+    { name: "NAVY", bg: "#27334f", snake: "#e2ded2", apple: "#f4e4bc" },
+  ];
+  const FLICKER_NAMES = ["OFF", "LOW", "MEDIUM", "HIGH"];
+  const GLOW_NAMES = ["OFF", "LOW", "MEDIUM", "STRONG", "HIGH"];
+
+  // Inside the Mac app, saves go to native storage and the window follows the theme; in a browser, localStorage.
+  const wk = window.webkit && window.webkit.messageHandlers;
+  const native = window.__nativeStore && wk && wk.store;
+  const nativeWin = wk && wk.win;
+  if (nativeWin) document.body.classList.add("native");
+
+  const store = {
+    get(k, fallback) {
+      try {
+        const v = native ? window.__nativeStore[k] : localStorage.getItem(k);
+        return v == null ? fallback : JSON.parse(v);
+      } catch { return fallback; }
+    },
+    set(k, v) {
+      const s = JSON.stringify(v);
+      try {
+        if (native) { window.__nativeStore[k] = s; native.postMessage({ key: k, value: s }); }
+        else localStorage.setItem(k, s);
+      } catch {}
+    }
+  };
+
+  const settings = Object.assign({}, DEFAULTS, store.get("snake.settings", {}));
+  if (!THEMES.includes(settings.theme)) settings.theme = "classic";
+  if (settings.mode !== "super") settings.mode = "normal";
+  const isSuper = () => settings.mode === "super";
+  const appleCount = () => isSuper() ? 1 : settings.apples;
+  const highScores = store.get("snake.highscores", {});
+  // Normal-mode keys are unchanged from before, so existing high scores carry over; Super Snake keeps its own.
+  const highKey = () => isSuper() ? `${settings.size}|${settings.speed}|super` : `${settings.size}|${settings.speed}|${settings.apples}`;
+  const getHigh = () => highScores[highKey()] || 0;
+
+  const earned = store.get("snake.achievements", {});
+  const achById = id => ACHIEVEMENTS.find(a => a.id === id);
+  const allUnlocked = () => EDITION === "personal" && settings.unlockAll;
+  const isUnlocked = feature => {
+    const a = ACHIEVEMENTS.find(x => x.unlocks === feature);
+    return !a || allUnlocked() || !!earned[a.id];
+  };
+  const treeOpen = t => !t.requires || !!earned[t.requires];
+  const achAvailable = a => treeOpen(TREES.find(t => t.id === a.tree)) && (!a.requires || !!earned[a.requires]);
+  const crtScheme = () => isUnlocked("crt:" + settings.crtScheme) ? settings.crtScheme : 0;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function award(id) {
+    const a = achById(id);
+    if (!a || earned[id] || !achAvailable(a)) return;
+    earned[id] = Date.now();
+    store.set("snake.achievements", earned);
+    achQueue.push(a);
+    setTimeout(showNextAchievement, 0); // after any power-up message from the same bite
+  }
+  const achQueue = [];
+  let achShowing = false;
+  function showNextAchievement() {
+    if (achShowing || !achQueue.length) return;
+    const a = achQueue.shift();
+    achShowing = true;
+    toast(`ACHIEVEMENT: ${a.name}`, `${UNLOCK_NAMES[a.unlocks]} unlocked`, 2800, true);
+    setTimeout(() => { achShowing = false; showNextAchievement(); }, 3000);
+  }
+
+  // Switch away from a theme the player hasn't unlocked. Returns true if the theme changed.
+  function enforceLocks() {
+    if (isUnlocked("theme:" + settings.theme)) return false;
+    settings.theme = "classic";
+    return true;
+  }
+  enforceLocks();
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("board"), ctx = canvas.getContext("2d");
+  const screen = $("screen");
+  const ui = { menu: $("menu"), paused: $("paused"), over: $("over"), achievements: $("achievements") };
+
+  // ---------- Menu wiring ----------
+  document.querySelectorAll(".seg").forEach(seg => {
+    const key = seg.dataset.setting;
+    seg.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => {
+        const changed = settings[key] !== b.dataset.v;
+        settings[key] = b.dataset.v;
+        if (key === "mode" && changed && isSuper()) introPending = true;
+        saveSettings();
+        if (key === "theme" && changed) applyTheme();
+      });
+    });
+  });
+  const colorInputs = { bg: $("cBg"), snake: $("cSnake"), apple: $("cApple") };
+  for (const [k, el] of Object.entries(colorInputs)) {
+    el.addEventListener("input", () => {
+      settings[k] = el.value;
+      if (settings.theme === "crt") settings.crtScheme = 0; // picking a color brings your own colors back
+      saveSettings();
+    });
+  }
+  $("appleCount").addEventListener("input", e => { settings.apples = +e.target.value; saveSettings(); });
+  $("resetColors").addEventListener("click", () => {
+    settings.bg = DEFAULTS.bg; settings.snake = DEFAULTS.snake; settings.apple = DEFAULTS.apple; saveSettings();
+  });
+  $("startBtn").addEventListener("click", start);
+  $("achBtn").addEventListener("click", showAchievements);
+  $("achBack").addEventListener("click", () => show("menu"));
+  $("lockBtn").addEventListener("click", () => {
+    settings.unlockAll = !settings.unlockAll;
+    const themeChanged = enforceLocks();
+    saveSettings();
+    if (themeChanged) applyTheme();
+  });
+  $("againBtn").addEventListener("click", start);
+  $("menuBtn").addEventListener("click", showMenu);
+
+  function saveSettings() { store.set("snake.settings", settings); refreshMenu(); }
+
+  function refreshMenu() {
+    document.querySelectorAll(".seg").forEach(seg => {
+      seg.querySelectorAll("button").forEach(b => {
+        b.classList.toggle("on", settings[seg.dataset.setting] === b.dataset.v);
+        const feature = seg.dataset.setting === "theme" ? "theme:" + b.dataset.v : null;
+        const locked = !!feature && !isUnlocked(feature);
+        b.dataset.label ??= b.textContent;
+        b.disabled = locked;
+        b.classList.toggle("locked", locked);
+        b.innerHTML = (locked ? LOCK_SVG : "") + esc(b.dataset.label);
+        b.title = locked ? `Earn “${ACHIEVEMENTS.find(a => a.unlocks === feature).name}” to unlock` : "";
+      });
+    });
+    const colorsLocked = !isUnlocked("colors");
+    document.querySelector(".colors-row").classList.toggle("is-locked", colorsLocked);
+    $("colorsLocked").innerHTML = `${LOCK_SVG} Earn “Lazy Day” to unlock`;
+    $("resetRow").classList.toggle("hidden", colorsLocked);
+    $("lockBtn").classList.toggle("hidden", EDITION !== "personal");
+    $("lockBtn").classList.toggle("unlocked", allUnlocked());
+    $("lockBtn").innerHTML = allUnlocked() ? UNLOCK_SVG : LOCK_SVG;
+    $("lockBtn").title = allUnlocked()
+      ? "Everything unlocked — click to play with achievement locks"
+      : "Achievement locks on — click to unlock everything";
+    for (const [k, el] of Object.entries(colorInputs)) el.value = settings[k];
+    $("appleCount").value = appleCount();
+    $("appleCount").disabled = isSuper();
+    $("appleCountLabel").textContent = appleCount();
+    document.body.classList.toggle("mode-super", isSuper());
+    $("menuHigh").textContent = getHigh();
+    screen.style.setProperty("--phosphor", palette().snake);
+    screen.style.setProperty("--crtbg", palette().bg);
+    screen.dataset.flicker = settings.crtFlicker;
+    $("knobFlicker").style.setProperty("--rot", `${-90 + settings.crtFlicker * 60}deg`);
+    $("knobColor").style.setProperty("--rot", `${-90 + crtScheme() * 60}deg`);
+    $("knobGlow").style.setProperty("--rot", `${-120 + settings.crtGlow * 60}deg`);
+    screen.style.setProperty("--glow", settings.crtGlow / 4);
+    drawTitle();
+    updateHud();
+    if (state === "menu") resetBoard();
+    draw();
+  }
+
+  function updateHud() {
+    const nokia = settings.theme === "nokia";
+    const fmt = n => nokia ? String(n).padStart(4, "0") : n;
+    $("score").textContent = fmt(score);
+    $("high").textContent = fmt(getHigh());
+    const cap = s => s[0].toUpperCase() + s.slice(1);
+    const extra = isSuper() ? " · Super" : appleCount() > 1 ? ` · ${appleCount()} apples` : "";
+    $("mode").textContent = `${cap(settings.size)} · ${cap(settings.speed)}${extra}`;
+    $("shieldIcon").classList.toggle("hidden", !shieldActive);
+  }
+
+  let toastTimer;
+  function toast(text, sub = "", ms = 1300, priority = false) {
+    if (achShowing && !priority) return; // an achievement message stays up for its full time
+    const el = $("toast");
+    el.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : "");
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), ms);
+  }
+
+  function showAchievements() {
+    const done = ACHIEVEMENTS.filter(a => earned[a.id]).length;
+    $("achCount").textContent = `${done} / ${ACHIEVEMENTS.length} earned` + (allUnlocked() ? " · everything unlocked" : "");
+    const node = a => {
+      const status = earned[a.id] ? "earned" : achAvailable(a) ? "available" : "locked";
+      const mark = status === "earned" ? "✓" : status === "locked" ? LOCK_SVG : "○";
+      const kids = ACHIEVEMENTS.filter(c => c.requires === a.id && c.tree === a.tree);
+      return `<li class="${status}">
+        <div class="ach-name"><span class="ach-mark">${mark}</span>${esc(a.name)}</div>
+        ${a.hidden ? "" : `<div class="ach-desc">${esc(a.desc)}</div>`}
+        <div class="ach-reward">Unlocks: ${esc(UNLOCK_NAMES[a.unlocks])}</div>
+        ${kids.length ? `<ul class="ach-list">${kids.map(node).join("")}</ul>` : ""}
+      </li>`;
+    };
+    $("achTree").innerHTML = TREES.map(t => {
+      const roots = ACHIEVEMENTS.filter(a => a.tree === t.id && (!a.requires || achById(a.requires).tree !== t.id));
+      const gate = treeOpen(t) ? "" : `<small>${LOCK_SVG} opens after “${esc(achById(t.requires).name)}”</small>`;
+      return `<div class="ach-root ${treeOpen(t) ? "" : "locked"}">
+        <div class="ach-head">${t.name}${gate}</div>
+        <ul class="ach-list">${roots.map(node).join("")}</ul>
+      </div>`;
+    }).join("");
+    show("achievements");
+  }
+
+  // ---------- Themes ----------
+  function applyTheme() {
+    document.body.classList.remove(...THEMES.map(t => "theme-" + t));
+    document.body.classList.add("theme-" + settings.theme);
+    const nokia = settings.theme === "nokia";
+    $("controlsHint").textContent = nokia ? "2 4 6 8 move · 5 pause" : "Arrows / WASD to move · Space to pause";
+    $("pauseHint").textContent = nokia ? "5 to resume · C for menu" : "Press Space to resume · Esc for menu";
+    if (crtOff) setPower(true);
+    if (settings.theme === "crt") boot();
+    refreshMenu();
+    postLayout();
+  }
+
+  // CRT power: the screen collapses to a line when switched off and warms up when switched on.
+  let crtOff = false;
+  function boot() {
+    screen.classList.remove("booting");
+    void screen.offsetWidth;
+    screen.classList.add("booting");
+    setTimeout(() => screen.classList.remove("booting"), 750);
+  }
+  function setPower(on) {
+    crtOff = !on;
+    document.body.classList.toggle("crt-off", crtOff);
+    screen.classList.toggle("off", crtOff);
+    if (crtOff && state === "playing") togglePause();
+    if (on) boot();
+  }
+  $("power").addEventListener("click", () => setPower(crtOff));
+
+  // Knobs: flicker strength and color scheme, with an on-screen readout like a real monitor.
+  let osdTimer;
+  function osd(text) {
+    const el = $("osd");
+    el.textContent = text;
+    el.classList.add("show");
+    clearTimeout(osdTimer);
+    osdTimer = setTimeout(() => el.classList.remove("show"), 1400);
+  }
+  $("knobFlicker").addEventListener("click", () => {
+    if (crtOff) return;
+    settings.crtFlicker = (settings.crtFlicker + 1) % FLICKER_NAMES.length;
+    saveSettings();
+    const bars = "▮".repeat(settings.crtFlicker) + "▯".repeat(3 - settings.crtFlicker);
+    osd(`FLICKER ${bars} ${FLICKER_NAMES[settings.crtFlicker]}`);
+  });
+  $("knobColor").addEventListener("click", () => {
+    if (crtOff) return;
+    // cycle through the color schemes this player has unlocked
+    let next = crtScheme();
+    do next = (next + 1) % CRT_SCHEMES.length; while (!isUnlocked("crt:" + next));
+    settings.crtScheme = next;
+    saveSettings();
+    const anyLocked = CRT_SCHEMES.some((_, i) => !isUnlocked("crt:" + i));
+    osd(`COLOR: ${CRT_SCHEMES[next].name}${anyLocked && next === 0 ? " · MORE LOCKED" : ""}`);
+  });
+  $("knobGlow").addEventListener("click", () => {
+    if (crtOff) return;
+    settings.crtGlow = (settings.crtGlow + 1) % GLOW_NAMES.length;
+    saveSettings();
+    const bars = "▮".repeat(settings.crtGlow) + "▯".repeat(4 - settings.crtGlow);
+    osd(`GLOW ${bars} ${GLOW_NAMES[settings.crtGlow]}`);
+  });
+
+  function postLayout() {
+    if (!nativeWin) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const r = $("device").getBoundingClientRect();
+      nativeWin.postMessage({ cmd: "layout", theme: settings.theme, width: Math.ceil(r.width), height: Math.ceil(r.height) });
+    }));
+  }
+
+  // ---------- Game state ----------
+  let state = "menu";            // menu | intro | playing | paused | over
+  let N, cell, snake, dir, queue, score = 0, timer = null;
+  // Everything edible on the board: { x, y, kind } where kind is
+  // "apple" (1 point), "big" (2x2 apple, 4 points), "star" (power-up, with .power) or "rainbow" (shield star).
+  let apples = [];
+  let grow = 0;                  // segments still to add to the tail
+  let nearLeft = 0;              // apples left to place close to the head ("near" power-up)
+  let shieldActive = false;
+  let introPending = true;       // Super Snake intro plays on the first game of a session or after switching to Super
+  // Per-game counters for achievements
+  let run = {};
+
+  const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+  const inBounds = p => p.x >= 0 && p.y >= 0 && p.x < N && p.y < N;
+  const same = (a, b) => a.x === b.x && a.y === b.y;
+  const cellsOf = it => it.kind === "big"
+    ? [{ x: it.x, y: it.y }, { x: it.x + 1, y: it.y }, { x: it.x, y: it.y + 1 }, { x: it.x + 1, y: it.y + 1 }]
+    : [it];
+
+  function resetBoard() {
+    N = SIZES[settings.size];
+    cell = Math.floor(600 / N);
+    canvas.width = canvas.height = cell * N;
+    const mid = Math.floor(N / 2);
+    snake = [{ x: mid, y: mid }, { x: mid - 1, y: mid }, { x: mid - 2, y: mid }];
+    dir = { x: 1, y: 0 };
+    queue = [];
+    apples = [];
+    score = 0;
+    grow = 0;
+    nearLeft = 0;
+    shieldActive = false;
+    run = {
+      powerUps: 0,                       // power-ups (stars) collected this game
+      powerStreak: 0, powersAtStart: 0,  // power-ups in a row, and how many were on the board when the run began
+      bigStreak: 0, bigsAtStart: 0,      // big apples in a row (power-ups may come between, regular apples may not)
+    };
+    while (apples.length < appleCount() && spawnApple()) {}
+  }
+
+  function freeCells() {
+    const taken = new Set(snake.map(p => p.x + "," + p.y));
+    apples.forEach(a => cellsOf(a).forEach(c => taken.add(c.x + "," + c.y)));
+    const free = [];
+    for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) if (!taken.has(x + "," + y)) free.push({ x, y });
+    return free;
+  }
+
+  // A regular apple; while the "near" power-up is active it lands within 7 spaces (moves) of the head.
+  function spawnApple() {
+    let free = freeCells();
+    if (nearLeft > 0) {
+      const h = snake[0];
+      const near = free.filter(c => Math.abs(c.x - h.x) + Math.abs(c.y - h.y) <= NEAR_RADIUS);
+      if (near.length) free = near;
+      nearLeft--;
+    }
+    if (!free.length) return false;
+    apples.push({ ...rand(free), kind: "apple" });
+    return true;
+  }
+
+  function spawnAt(kind, extra = {}) {
+    const free = freeCells();
+    if (!free.length) return false;
+    apples.push({ ...rand(free), kind, ...extra });
+    return true;
+  }
+
+  // Two apples in a straight line with three empty spaces between them.
+  function spawnLine() {
+    const free = freeCells();
+    const freeSet = new Set(free.map(c => c.x + "," + c.y));
+    const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    for (let i = 0; i < 400 && free.length; i++) {
+      const a = rand(free), [dx, dy] = rand(dirs);
+      const b = { x: a.x + dx * 4, y: a.y + dy * 4 };
+      if (freeSet.has(b.x + "," + b.y)) {
+        apples.push({ ...a, kind: "apple" }, { ...b, kind: "apple" });
+        return;
+      }
+    }
+    spawnAt("apple"); spawnAt("apple");
+  }
+
+  function spawnBig() {
+    const freeSet = new Set(freeCells().map(c => c.x + "," + c.y));
+    const spots = [];
+    for (let x = 0; x < N - 1; x++) for (let y = 0; y < N - 1; y++) {
+      if (cellsOf({ x, y, kind: "big" }).every(c => freeSet.has(c.x + "," + c.y))) spots.push({ x, y });
+    }
+    if (spots.length) apples.push({ ...rand(spots), kind: "big" });
+  }
+
+  // After each apple: the shield (4%) and the other power-ups (10% in total) roll separately;
+  // if both hit, only the shield appears. No shield roll while one is active or already on the board.
+  function rollPowerUp() {
+    if (!isSuper()) return;
+    const shieldAllowed = !shieldActive && !apples.some(a => a.kind === "rainbow");
+    const shieldHit = shieldAllowed && Math.random() < SHIELD_CHANCE;
+    const powerHit = Math.random() < POWER_CHANCE;
+    if (shieldHit) spawnAt("rainbow");
+    else if (powerHit) spawnAt("star", { power: rand(POWERS) });
+  }
+
+  function applyPower(power) {
+    if (power === "near") nearLeft = NEAR_COUNT;
+    else if (power === "line") spawnLine();
+    else if (power === "four") for (let i = 0; i < 4; i++) spawnAt("apple");
+    else if (power === "big") spawnBig();
+    toast(POWER_TOASTS[power]);
+  }
+
+  // Returns false when the board is completely full.
+  function eat(item) {
+    trackForAchievements(item);
+    apples.splice(apples.indexOf(item), 1);
+    if (item.kind === "apple") { score += 1; grow += 1; rollPowerUp(); }
+    else if (item.kind === "big") { score += 4; grow += 4; rollPowerUp(); }
+    else if (item.kind === "star") { score += 1; grow += 1; applyPower(item.power); }
+    else if (item.kind === "rainbow") { score += 1; grow += 1; shieldActive = true; toast("SHIELD ON"); }
+    checkScoreAchievements();
+    // Keep at least one regular apple on the board (multi-apple mode keeps its full count).
+    let missing = appleCount() - apples.filter(a => a.kind === "apple").length;
+    if (isSuper()) missing = Math.min(missing, 1);
+    while (missing-- > 0 && spawnApple()) {}
+    return apples.length > 0;
+  }
+
+  // Called just before an item is eaten (it is still on the board).
+  function trackForAchievements(item) {
+    if (!isSuper()) return;
+    const onBoard = kinds => apples.filter(a => kinds.includes(a.kind)).length;
+    if (item.kind === "star" || item.kind === "rainbow") {
+      run.powerUps++;
+      if (run.powerStreak === 0) run.powersAtStart = onBoard(["star", "rainbow"]);
+      run.powerStreak++;
+      // 5 power-ups on the field, then all 5 collected without an apple in between
+      if (run.powerStreak >= 5 && run.powersAtStart >= 5) award("five-on-it");
+    } else if (item.kind === "big") {
+      run.powerStreak = 0;
+      if (run.bigStreak === 0) run.bigsAtStart = onBoard(["big"]);
+      run.bigStreak++;
+      // 3 big apples on the field, then all 3 collected without a regular apple in between
+      if (run.bigStreak >= 3 && run.bigsAtStart >= 3) award("insatiable");
+    } else {
+      run.powerStreak = 0;
+      run.bigStreak = 0;
+    }
+  }
+
+  function checkScoreAchievements() {
+    const { size, speed } = settings;
+    if (isSuper()) {
+      if (score >= 75 && run.powerUps === 0) award("patience");
+      return;
+    }
+    if (appleCount() !== 1) return; // Classic achievements count only with the standard single apple
+    if (size === "medium" && speed === "medium" && score >= 100) award("getting-started");
+    if (size === "small" && speed === "fast" && score >= 50) award("fast-50");
+    if (size === "large" && speed === "slow" && score >= 150) award("lazy-day");
+  }
+
+  function start() {
+    resetBoard();
+    show(null);
+    updateHud();
+    draw();
+    clearInterval(timer);
+    const run = () => {
+      if (crtOff) { state = "paused"; show("paused"); return; }
+      state = "playing";
+      timer = setInterval(step, SPEEDS[settings.speed]);
+    };
+    if (isSuper() && introPending) {
+      introPending = false;
+      state = "intro";
+      playIntro(() => { draw(); run(); });
+    } else {
+      run();
+    }
+  }
+
+  function showMenu() {
+    clearInterval(timer);
+    state = "menu";
+    show("menu");
+    refreshMenu();
+  }
+
+  function show(name) {
+    for (const [k, el] of Object.entries(ui)) el.classList.toggle("hidden", k !== name);
+  }
+
+  function step() {
+    if (queue.length) dir = queue.shift();
+    let head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    let shieldUsed = false;
+
+    // The shield absorbs exactly one mistake: hitting a wall warps to the other side...
+    if (!inBounds(head)) {
+      if (!shieldActive) return gameOver();
+      head = { x: (head.x + N) % N, y: (head.y + N) % N };
+      shieldActive = false;
+      shieldUsed = true;
+    }
+
+    const item = apples.find(a => cellsOf(a).some(c => same(c, head)));
+    // The tail moves out of the way this step unless the snake is growing.
+    const body = item || grow > 0 ? snake : snake.slice(0, -1);
+    // ...and running into itself passes straight through (a second crossing still ends the game).
+    if (body.some(p => same(p, head))) {
+      if (!shieldActive) return gameOver();
+      shieldActive = false;
+      shieldUsed = true;
+    }
+
+    snake.unshift(head);
+    const boardHasRoom = item ? eat(item) : true;
+    if (grow > 0) grow--; else snake.pop();
+    if (shieldUsed) toast("SHIELD USED");
+    if (!boardHasRoom) return gameOver(); // board completely filled
+    updateHud();
+    draw();
+  }
+
+  function gameOver() {
+    clearInterval(timer);
+    state = "over";
+    const isNew = score > getHigh();
+    if (isNew) { highScores[highKey()] = score; store.set("snake.highscores", highScores); }
+    $("finalScore").textContent = score;
+    $("finalHigh").textContent = getHigh();
+    $("newBest").classList.toggle("hidden", !isNew);
+    updateHud();
+    draw();
+    show("over");
+  }
+
+  function togglePause() {
+    if (state === "playing") { clearInterval(timer); state = "paused"; show("paused"); }
+    else if (state === "paused") { state = "playing"; show(null); timer = setInterval(step, SPEEDS[settings.speed]); }
+  }
+
+  // ---------- Drawing ----------
+  function draw() {
+    const theme = settings.theme;
+    const pal = palette();
+
+    ctx.fillStyle = pal.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // faint grid lines, slightly lighter (or darker, on light backgrounds) than the background
+    ctx.strokeStyle = theme === "nokia" ? "rgba(28,36,22,0.06)" : gridColor(pal.bg);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      ctx.moveTo(i * cell + 0.5, 0); ctx.lineTo(i * cell + 0.5, canvas.height);
+      ctx.moveTo(0, i * cell + 0.5); ctx.lineTo(canvas.width, i * cell + 0.5);
+    }
+    ctx.stroke();
+
+    const gap = Math.max(1, Math.round(cell * 0.06));
+    const block = (p, o = 0) => ctx.fillRect(p.x * cell + gap + o, p.y * cell + gap + o, cell - gap * 2, cell - gap * 2);
+    // Nokia food: a small diamond of four dots
+    const food = (p, o = 0) => {
+      const s = (cell - gap * 2) / 3, x0 = p.x * cell + gap + o, y0 = p.y * cell + gap + o;
+      for (const [i, j] of [[1, 0], [0, 1], [2, 1], [1, 2]]) ctx.fillRect(x0 + i * s, y0 + j * s, s, s);
+    };
+    const star = (p, o = 0) => {
+      starPath(ctx, p.x * cell + cell / 2 + o, p.y * cell + cell / 2 + o, cell * 0.5, cell * 0.21);
+      ctx.fill();
+    };
+    // shadowPass: Nokia's faint LCD shadow, drawn in one flat color
+    const drawItem = (it, color, o = 0, shadowPass = false) => {
+      if (it.kind === "rainbow") return shadowPass ? (ctx.fillStyle = color, star(it, o)) : rainbowStar(it);
+      ctx.fillStyle = color;
+      if (it.kind === "big") return bigApple(it, color, o, shadowPass);
+      if (it.kind === "star") return star(it, o);
+      theme === "nokia" ? food(it, o) : block(it, o);
+    };
+
+    if (theme === "nokia") {
+      // LCD pixels cast a faint shadow onto the backplane
+      const o = Math.max(1, Math.round(cell * 0.08));
+      const shadow = "rgba(28,36,22,0.16)";
+      apples.forEach(a => drawItem(a, shadow, o, true));
+      ctx.fillStyle = shadow;
+      snake.forEach(p => block(p, o));
+      apples.forEach(a => drawItem(a, pal.apple));
+      ctx.fillStyle = pal.snake;
+      snake.forEach(p => block(p));
+      return;
+    }
+
+    const glow = theme === "crt";
+    if (glow) ctx.shadowBlur = cell * 0.6 * settings.crtGlow / 4;
+    ctx.shadowColor = pal.apple;
+    apples.forEach(a => drawItem(a, pal.apple));
+    if (glow) ctx.shadowBlur = cell * 0.6 * settings.crtGlow / 4;
+    ctx.fillStyle = ctx.shadowColor = pal.snake;
+    snake.forEach(p => block(p));
+    ctx.shadowBlur = 0;
+  }
+
+  function starPath(c, cx, cy, R, r) {
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R;
+      c.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+    }
+    c.closePath();
+  }
+
+  // The shield star is always a shimmering rainbow, whatever the theme.
+  function rainbowStar(it) {
+    const t = performance.now() / 1000;
+    const cx = it.x * cell + cell / 2, cy = it.y * cell + cell / 2;
+    const R = cell * (0.52 + 0.04 * Math.sin(t * 6));
+    const a = t * 2.5;
+    const g = ctx.createLinearGradient(cx - Math.cos(a) * R, cy - Math.sin(a) * R, cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${(t * 140 + i * 60) % 360}, 100%, 60%)`);
+    ctx.save();
+    ctx.shadowColor = `hsl(${(t * 140) % 360}, 100%, 60%)`;
+    ctx.shadowBlur = cell * 0.5;
+    ctx.fillStyle = g;
+    starPath(ctx, cx, cy, R, R * 0.42);
+    ctx.fill();
+    // twinkle
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 9);
+    ctx.fillStyle = "#fff";
+    starPath(ctx, cx - R * 0.15, cy - R * 0.2, R * 0.22, R * 0.07);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // A real apple shape (body, stem, leaf) filling a 2x2 area.
+  function bigApple(it, color, o, flat) {
+    const s = cell * 2, x = it.x * cell + o, y = it.y * cell + o, cx = x + s / 2;
+    const nokia = settings.theme === "nokia";
+    ctx.beginPath();
+    ctx.moveTo(cx, y + s * 0.3);
+    ctx.bezierCurveTo(cx - s * 0.1, y + s * 0.18, cx - s * 0.46, y + s * 0.18, cx - s * 0.45, y + s * 0.52);
+    ctx.bezierCurveTo(cx - s * 0.44, y + s * 0.8, cx - s * 0.22, y + s * 0.98, cx - s * 0.1, y + s * 0.93);
+    ctx.bezierCurveTo(cx - s * 0.04, y + s * 0.9, cx + s * 0.04, y + s * 0.9, cx + s * 0.1, y + s * 0.93);
+    ctx.bezierCurveTo(cx + s * 0.22, y + s * 0.98, cx + s * 0.44, y + s * 0.8, cx + s * 0.45, y + s * 0.52);
+    ctx.bezierCurveTo(cx + s * 0.46, y + s * 0.18, cx + s * 0.1, y + s * 0.18, cx, y + s * 0.3);
+    ctx.fillStyle = color;
+    ctx.fill();
+    const theme = settings.theme;
+    const stem = flat || nokia ? color : theme === "crt" ? color : "#6b4423";
+    const leaf = flat || nokia ? color : theme === "crt" ? palette().snake : "#4caf50";
+    ctx.strokeStyle = stem;
+    ctx.lineWidth = s * 0.06;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx, y + s * 0.3);
+    ctx.quadraticCurveTo(cx - s * 0.02, y + s * 0.14, cx + s * 0.06, y + s * 0.05);
+    ctx.stroke();
+    ctx.fillStyle = leaf;
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 0.19, y + s * 0.12, s * 0.13, s * 0.055, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    if (!flat) {
+      // shine (on the LCD, a cut-out highlight in the background color)
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = nokia ? NOKIA.bg : "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(cx - s * 0.22, y + s * 0.48, s * 0.05, s * 0.11, 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Keep the rainbow star shimmering between game steps.
+  let lastAnim = 0;
+  (function animate(now) {
+    if (now - lastAnim > 40 && (state === "playing" || state === "paused") && apples.some(a => a.kind === "rainbow")) {
+      lastAnim = now;
+      draw();
+    }
+    requestAnimationFrame(animate);
+  })(0);
+
+  function drawWord(c, word, cx, cy, px, color) {
+    const w = (word.length * 7 - 2) * px, x0 = cx - w / 2, y0 = cy - 2.5 * px;
+    [...word].forEach((ch, i) => FONT[ch].forEach((row, y) => [...row].forEach((bit, x) => {
+      if (bit !== "1") return;
+      c.fillStyle = typeof color === "function" ? color(i) : color;
+      c.fillRect(x0 + (i * 7 + x) * px, y0 + y * px, px + 0.5, px + 0.5);
+    })));
+  }
+
+  // Super Snake intro (~2.4s): a burst of stars, "SUPER" pops in with a rainbow shimmer, "SNAKE" slides up.
+  function playIntro(done) {
+    const DURATION = 2400, W = canvas.width, mid = W / 2;
+    const pal = palette(), nokia = settings.theme === "nokia";
+    const glow = settings.theme === "crt" ? settings.crtGlow / 4 : 0;
+    const easeOut = t => 1 - Math.pow(1 - t, 3);
+    const easeBack = t => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+    const clamp = t => Math.max(0, Math.min(1, t));
+    const t0 = performance.now();
+    (function frame(now) {
+      const t = Math.min(1, (now - t0) / DURATION);
+      const hue = i => `hsl(${(now / 4 + i * 55) % 360}, 100%, ${nokia ? 15 : 62}%)`;
+      ctx.fillStyle = pal.bg;
+      ctx.fillRect(0, 0, W, W);
+
+      // star burst
+      const burst = easeOut(clamp(t / 0.8));
+      ctx.globalAlpha = 1 - clamp((t - 0.3) / 0.5);
+      for (let k = 0; k < 14; k++) {
+        const a = k * (Math.PI * 2 / 14) + t * 1.5, d = burst * W * 0.62;
+        ctx.fillStyle = nokia ? pal.snake : hue(k);
+        starPath(ctx, mid + Math.cos(a) * d, mid + Math.sin(a) * d, W * 0.035 * (1 - t * 0.4), W * 0.014);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      if (glow) { ctx.shadowBlur = W * 0.02 * glow; ctx.shadowColor = pal.snake; }
+      const pop = clamp((t - 0.05) / 0.3);
+      if (pop > 0) drawWord(ctx, "SUPER", mid, mid - W * 0.09, (W / 46) * easeBack(pop), nokia ? pal.snake : hue);
+      const slide = easeOut(clamp((t - 0.3) / 0.3));
+      if (slide > 0) {
+        ctx.globalAlpha = slide;
+        drawWord(ctx, "SNAKE", mid, mid + W * 0.1 + (1 - slide) * W * 0.15, W / 62, pal.snake);
+        ctx.globalAlpha = 1;
+      }
+      ctx.shadowBlur = 0;
+
+      // fade into the board
+      const fade = clamp((t - 0.85) / 0.15);
+      if (fade > 0) {
+        draw();
+        ctx.globalAlpha = 1 - fade;
+        ctx.fillStyle = pal.bg;
+        ctx.fillRect(0, 0, W, W);
+        ctx.globalAlpha = 1;
+      }
+      if (t < 1) requestAnimationFrame(frame); else done();
+    })(t0);
+  }
+
+  function palette() {
+    if (settings.theme === "nokia") return { bg: NOKIA.bg, snake: NOKIA.fg, apple: NOKIA.fg };
+    const scheme = settings.theme === "crt" && CRT_SCHEMES[crtScheme()];
+    if (scheme && scheme.bg) return scheme;
+    const c = isUnlocked("colors") ? settings : DEFAULTS;
+    return { bg: c.bg, snake: c.snake, apple: c.apple };
+  }
+
+  function gridColor(hex) {
+    const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    const light = (r * 299 + g * 587 + b * 114) / 1000 > 128;
+    return light ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)";
+  }
+
+  // Pixel-font "SNAKE" title (5x5 bitmap per letter), drawn locally so no web fonts are needed.
+  function drawTitle() {
+    const FONT = {
+      S: ["01111", "10000", "01110", "00001", "11110"],
+      N: ["10001", "11001", "10101", "10011", "10001"],
+      A: ["01110", "10001", "11111", "10001", "10001"],
+      K: ["10001", "10010", "11100", "10010", "10001"],
+      E: ["11111", "10000", "11110", "10000", "11111"],
+    };
+    const t = $("title"), px = 8, word = "SNAKE", spacing = 2;
+    t.width = (word.length * (5 + spacing) - spacing) * px;
+    t.height = 5 * px;
+    const c = t.getContext("2d");
+    c.fillStyle = { classic: "#d9f27a", nokia: NOKIA.fg, crt: palette().snake }[settings.theme];
+    [...word].forEach((ch, i) => FONT[ch].forEach((row, y) => [...row].forEach((bit, x) => {
+      if (bit === "1") c.fillRect((i * (5 + spacing) + x) * px, y * px, px, px);
+    })));
+  }
+
+  // ---------- Input ----------
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  function act(a) {
+    if (crtOff) return;
+    if (!ui.achievements.classList.contains("hidden")) {
+      if (a === "escape" || a === "select" || a === "start") show("menu");
+      if (a === "up" || a === "down") ui.achievements.scrollBy({ top: a === "up" ? -40 : 40, behavior: "smooth" });
+      return;
+    }
+    if (DIRS[a]) {
+      if (state !== "playing") return;
+      const [x, y] = DIRS[a];
+      const last = queue.length ? queue[queue.length - 1] : dir;
+      if ((x === -last.x && y === -last.y) || (x === last.x && y === last.y)) return;
+      if (queue.length < 3) queue.push({ x, y });
+    } else if (a === "pause") {
+      togglePause();
+    } else if (a === "start") {
+      if (state === "menu" || state === "over") start();
+    } else if (a === "select") {
+      if (state === "menu" || state === "over") start(); else togglePause();
+    } else if (a === "escape") {
+      if (state === "paused" || state === "over") showMenu();
+    }
+  }
+
+  const KEYS = {
+    ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+    w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right",
+    2: "up", 8: "down", 4: "left", 6: "right", 5: "select",
+    " ": "pause", Enter: "start", Escape: "escape",
+  };
+  document.addEventListener("keydown", e => {
+    const a = KEYS[e.key];
+    if (!a || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    act(a);
+  });
+
+  // Phone keypad
+  document.querySelectorAll(".keypad [data-act]").forEach(k => {
+    k.addEventListener("pointerdown", () => act(k.dataset.act));
+  });
+  // Keep buttons from taking keyboard focus, so Space/Enter always reach the game.
+  document.addEventListener("mousedown", e => { if (e.target.closest("button")) e.preventDefault(); });
+
+  // ---------- Mac app window ----------
+  if (nativeWin) {
+    document.querySelectorAll("[data-win]").forEach(b => {
+      b.addEventListener("click", () => nativeWin.postMessage({ cmd: b.dataset.win }));
+    });
+    // Tell the app when the pointer is over the device's case, so dragging there moves the window.
+    let lastDrag = null;
+    document.addEventListener("mousemove", e => {
+      const drag = settings.theme !== "classic"
+        && !!e.target.closest(".case, .crt-stand")
+        && !e.target.closest("button, input, label, summary, details, #screen");
+      if (drag !== lastDrag) { lastDrag = drag; nativeWin.postMessage({ cmd: "drag", enabled: drag }); }
+    });
+  }
+
+  resetBoard();
+  applyTheme();
+  showMenu();
+})();
+</script>
+</body>
+</html>
