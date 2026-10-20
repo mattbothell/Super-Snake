@@ -234,6 +234,11 @@
   .theme-nokia .ach-snake svg { height: 12px; width: 120px; }
   @media (prefers-reduced-motion: reduce) { .ach-snake svg { animation: none; transform: translateX(20px); } }
 
+  /* ---------- Loading screen (plays once when the app opens) ---------- */
+  #intro { position: absolute; inset: 0; z-index: 4; background: #000; cursor: pointer; transition: opacity 0.5s; }
+  #intro.fading { opacity: 0; pointer-events: none; }
+  #introCanvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
   /* ---------- Blackjack (Nokia bonus game) ---------- */
   #bj { position: absolute; inset: 6px; z-index: 7; display: flex; align-items: center; justify-content: center; background: #9eaa87; border-radius: 2px; }
   #bjCanvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
@@ -527,6 +532,7 @@
           <div id="board-wrap">
             <canvas id="board" width="600" height="600"></canvas>
             <div id="toast"></div>
+            <div id="intro" class="hidden"><canvas id="introCanvas" width="432" height="432" aria-label="Loading"></canvas></div>
 
             <!-- Menu -->
             <div class="overlay" id="menu">
@@ -1642,6 +1648,269 @@
     })));
   }
 
+  // ---------- Loading screen: apples fly together into a viper head that chomps an apple, then fade to the menu ----------
+  const loadingScreen = (() => {
+    const P = { g: "#6ddb4c", d: "#2f7a22", k: "#111111", y: "#ffd23f", m: "#5b1219", t: "#2a070b",
+                f: "#f4f4f4", p: "#ff5c8a", r: "#e83a3a", h: "#ff8f80", l: "#5fcf3f", s: "#7a4a22" };
+    const MOUTHC = new Set([P.m, P.t, P.p]);
+    // timeline in seconds: blocks assemble, apple rises into the mouth, jaw closes in 3 frames, fade out
+    const T = { asm: 2.1, appr0: 2.15, appr1: 2.55, steps: [2.62, 2.70, 2.78], fade0: 3.45, end: 3.9 };
+    const N = 36, cx = 18;
+
+    function rng(seed) {
+      return () => {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+    const ease = p => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    function inPoly(px, py, pts) {
+      let c = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const [xi, yi] = pts[i], [xj, yj] = pts[j];
+        if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) c = !c;
+      }
+      return c;
+    }
+    // half outline: right-hand points [dx, y] from top centre round to bottom centre
+    function mirror(half) {
+      const R = half.map(([dx, y]) => [cx + dx, y]);
+      const L = half.slice(1, -1).reverse().map(([dx, y]) => [cx - dx, y]);
+      return R.concat(L);
+    }
+    function segD(px, py, ax, ay, bx, by) {
+      const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+      const t = l ? clamp(((px - ax) * dx + (py - ay) * dy) / l) : 0;
+      return Math.hypot(ax + t * dx - px, ay + t * dy - py);
+    }
+    const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const toHex = c => "#" + c.map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
+    const mixHex = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return toHex(A.map((v, i) => v + (B[i] - v) * t)); };
+
+    class Img {
+      constructor() { this.c = new Map(); }
+      set(x, y, v) { if (x >= 0 && y >= 0 && x < N && y < N && v) this.c.set(y * N + x, v); }
+      paint(fn) { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = fn(x + 0.5, y + 0.5, x, y); if (v) this.set(x, y, v); } }
+    }
+    // green cells on the silhouette edge become dark green
+    function shade(layers) {
+      const topAt = k => { for (let i = layers.length - 1; i >= 0; i--) { const v = layers[i].c.get(k); if (v) return v; } };
+      layers.forEach(L => {
+        const ch = [];
+        L.c.forEach((v, k) => {
+          if (v !== P.g) return;
+          const x = k % N, y = (k / N) | 0;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= N || ny >= N || !topAt(ny * N + nx)) { ch.push(k); return; }
+          }
+        });
+        ch.forEach(k => L.c.set(k, P.d));
+      });
+    }
+
+    const APPLE = ["..sLL.", ".RRRR.", "RhRRRR", "RhRRRR", "RRRRRR", ".RRRR."];
+    const AMAP = { s: P.s, L: P.l, R: P.r, h: P.h };
+    const appleCells = (x0, y0) => {
+      const out = [];
+      APPLE.forEach((row, j) => [...row].forEach((ch, i) => { if (AMAP[ch]) out.push([x0 + i, y0 + j, AMAP[ch]]); }));
+      return out;
+    };
+
+    // Front-view viper: flat top with a small notch, sharp brow corners, angry slit eyes, a wide gaping mouth.
+    const HEAD = mirror([[0, 3.7], [1.9, 2.3], [12.4, 2.3], [16.1, 2.1], [15.0, 5.3], [15.7, 9], [16.2, 13], [15.2, 17],
+                         [13.4, 21], [10.6, 24.8], [7.0, 27.7], [3.4, 29.2], [0, 29.6]]);
+    const MOUTH = mirror([[0, 13.8], [4, 14.0], [9, 14.8], [13.6, 16.3], [12.2, 18.6], [10.0, 22.3], [6.6, 25.2], [3.3, 26.6], [0, 26.9]]);
+    const lip = dx => { const a = Math.abs(dx); return a <= 13.6 ? 13.8 + (a / 13.6) ** 2 * 2.5 : 16.3; };
+    const FR = [[cx + 8.4, 14.4], [cx + 11.6, 15.0], [cx + 9.9, 21.8]], FL = FR.map(([x, y]) => [2 * cx - x, y]);
+    const top = [], bot = [];
+    for (let x = 0; x < N; x++) {
+      top[x] = bot[x] = -1;
+      for (let y = 0; y < N; y++) if (inPoly(x + 0.5, y + 0.5, MOUTH)) { if (top[x] < 0) top[x] = y; bot[x] = y; }
+    }
+    const tongue = new Set();
+    for (let y = 22; y <= 26; y++) { tongue.add(y * N + 17); tongue.add(y * N + 18); }
+    [[16, 21], [19, 21], [15, 20], [20, 20]].forEach(([x, y]) => tongue.add(y * N + x));
+    const JAW = [1, 0.55, 0.2, 0], memo = {};
+    // frame k of the bite: the lower jaw rises as one piece (k = 0 open … 3 shut)
+    function build(k) {
+      if (memo[k]) return memo[k];
+      const dcol = top.map(() => Math.round((1 - JAW[k]) * 6));
+      const back = new Img(), front = new Img();
+      back.paint((x, y, ix, iy) => {
+        if (!inPoly(x, y, HEAD)) return;
+        const dx = x - cx, ax = Math.abs(dx);
+        if (y < lip(dx)) {
+          if (segD(ax, y, 16.0, 2.4, 4.6, 7.2) < 1.05) return P.d;                                // slanted brow
+          const e = ((ax - 10.4) / 3.9) ** 2 + ((y - 8.1) / 2.2) ** 2;
+          if (e < 1) return (ix === 28 || ix === 7) ? P.k : P.y;                                 // slit eyes
+          if (e < 1.6 && y > 8.1) return P.d;
+          if (ax < 6 && y > 4 && y < 9.5 && (ix + (iy >> 1)) % 3 === 0 && iy % 2 === 0) return P.d; // crown scales
+          if (iy === 11 && (ix === 15 || ix === 20)) return P.k;                                 // nostrils
+          if (ax < 1 && y > 3.7 && y < 6) return P.d;                                            // notch crease
+          return P.g;
+        }
+        if (inPoly(x, y, MOUTH) && iy + dcol[ix] <= bot[ix]) {
+          if (tongue.has(iy * N + ix)) return P.p;
+          return (dx / 6.5) ** 2 + ((y - 21.8) / 3.8) ** 2 < 1 ? P.t : P.m;
+        }
+      });
+      front.paint((x, y, ix) => {
+        const sy = y + dcol[ix];
+        if (!inPoly(x, sy, HEAD) || sy < lip(x - cx) || y < lip(x - cx) || inPoly(x, sy, MOUTH)) return;
+        return P.g;
+      });
+      const lipCells = [];
+      back.c.forEach((v, kk) => {
+        if (v !== P.g) return;
+        const x = kk % N, b = kk + N;
+        if (top[x] >= 0 && (MOUTHC.has(back.c.get(b)) || front.c.has(b))) lipCells.push(kk);
+      });
+      lipCells.forEach(kk => back.c.set(kk, P.d));
+      front.paint((x, y) => (inPoly(x, y, FR) || inPoly(x, y, FL)) ? P.f : null);
+      shade([back, front]);
+      return memo[k] = { back, front, dcol };
+    }
+    const appleAt = a => [15, Math.round(30 + (16 - 30) * a)];
+    const appleClip = (st, x, y) => y + st.dcol[x] <= bot[x];
+
+    // Colours per theme: Classic as designed; Nokia in two LCD tones; CRT tinted by the current phosphor scheme.
+    function themeColors() {
+      if (settings.theme === "nokia") {
+        const FG = NOKIA.fg, BG = NOKIA.bg, MID = mixHex(FG, BG, 0.5);
+        const map = { [P.g]: MID, [P.d]: FG, [P.k]: FG, [P.y]: BG, [P.m]: FG, [P.t]: FG, [P.f]: BG, [P.p]: MID, [P.r]: FG, [P.h]: MID, [P.l]: MID, [P.s]: FG };
+        return { bg: BG, grid: "rgba(28,36,22,0.06)", col: c => map[c] || c };
+      }
+      const pal = palette();
+      if (settings.theme === "crt" && crtScheme() !== 0) {
+        const cache = {};
+        return {
+          bg: pal.bg, grid: gridColor(pal.bg),
+          col: c => cache[c] || (cache[c] = (() => {
+            const [r, g, b] = hexRgb(c), lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return mixHex(pal.bg, pal.snake, 0.06 + 0.94 * lum ** 1.4);
+          })()),
+        };
+      }
+      return { bg: "#000000", grid: "rgba(255,255,255,0.08)", col: c => c };
+    }
+
+    const cv = $("introCanvas"), ctx = cv.getContext("2d"), W = cv.width, cs = W / N, gap = Math.max(1, Math.round(cs * 0.06));
+    let running = false, t = 0, last = 0, colors = null, apples = [], blocks = [], crumbs = [], hideTimer, safetyTimer;
+
+    function prepare() {
+      const R = rng(1234), st = build(0), tgt = new Map();
+      st.back.c.forEach((v, k) => tgt.set(k, v));
+      const [ax, ay] = appleAt(0);
+      appleCells(ax, ay).forEach(([x, y, v]) => tgt.set(y * N + x, v));
+      st.front.c.forEach((v, k) => tgt.set(k, v));
+      apples = [];
+      for (let guard = 0; apples.length < 38 && guard < 5000; guard++) {
+        const x = 1 + Math.floor(R() * (N - 2)), y = 1 + Math.floor(R() * (N - 2));
+        if (apples.some(a => Math.abs(a.x - x) < 3 && Math.abs(a.y - y) < 3)) continue;
+        apples.push({ x, y, pop: R() * 0.35, brk: 0.5 + R() * 0.45, n: 0 });
+      }
+      // each target block flies out of one of the nearest apples
+      blocks = [];
+      tgt.forEach((col, k) => {
+        const x = k % N, y = (k / N) | 0;
+        const near = apples.map(a => [(a.x - x) ** 2 + (a.y - y) ** 2, a]).sort((p, q) => p[0] - q[0]).slice(0, 5);
+        const ap = near[Math.floor(R() * near.length)][1]; ap.n++;
+        blocks.push({ ap, tx: x, ty: y, col, j: R(), dur: 0.5 + R() * 0.3, arc: (R() - 0.5) * 5 });
+      });
+      for (const ap of apples) while (ap.n < 4) { const b = blocks[Math.floor(R() * blocks.length)]; if (b.ap.n > 6) { b.ap.n--; b.ap = ap; ap.n++; } }
+      blocks.forEach(b => { b.delay = b.ap.brk + b.j * 0.3; });
+      crumbs = [];
+      const mk = (t0, n) => { for (let i = 0; i < n; i++) crumbs.push({ t0, vx: (R() - 0.5) * 16, vy: -4 - R() * 9, col: R() < 0.15 ? P.l : R() < 0.3 ? P.h : P.r }); };
+      mk(T.steps[1], 5); mk(T.steps[2], 9);
+    }
+
+    const blk = (x, y, col) => { ctx.fillStyle = colors.col(col); ctx.fillRect(x * cs + gap, y * cs + gap, cs - 2 * gap, cs - 2 * gap); };
+    function draw() {
+      ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, W, W);
+      ctx.strokeStyle = colors.grid; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const p = Math.round(i * cs) + 0.5; ctx.moveTo(p, 0); ctx.lineTo(p, W); ctx.moveTo(0, p); ctx.lineTo(W, p); }
+      ctx.stroke();
+      if (t < T.asm) {
+        for (const ap of apples) {
+          if (t < ap.pop || t >= ap.brk) continue;
+          const s = clamp((t - ap.pop) / 0.12), sz = (cs - 2 * gap) * s, o = (cs - sz) / 2;
+          const wob = t > ap.brk - 0.12 ? Math.sin(t * 90) * cs * 0.08 : 0;   // shiver before bursting
+          ctx.fillStyle = colors.col(P.r); ctx.fillRect(ap.x * cs + o + wob, ap.y * cs + o, sz, sz);
+          ctx.fillStyle = colors.col(P.l); ctx.fillRect(ap.x * cs + o + sz * 0.6 + wob, ap.y * cs + o, sz * 0.4, sz * 0.3);
+        }
+        for (const b of blocks) {
+          if (t < b.ap.brk) continue;
+          const p = clamp((t - b.delay) / b.dur);
+          if (p <= 0) { blk(b.ap.x, b.ap.y, P.r); continue; }
+          const e = ease(p), dx = b.tx - b.ap.x, dy = b.ty - b.ap.y, len = Math.hypot(dx, dy) || 1, off = Math.sin(Math.PI * e) * b.arc;
+          const col = p >= 1 ? b.col : mixHex(colors.col(P.r), colors.col(b.col), e);
+          ctx.fillStyle = p >= 1 ? colors.col(b.col) : col;
+          ctx.fillRect((b.ap.x + dx * e - dy / len * off) * cs + gap, (b.ap.y + dy * e + dx / len * off) * cs + gap, cs - 2 * gap, cs - 2 * gap);
+        }
+      } else {
+        let k = 0;
+        T.steps.forEach((s, i) => { if (t >= s) k = i + 1; });
+        const a = ease(clamp((t - T.appr0) / (T.appr1 - T.appr0)));
+        const st = build(k);
+        st.back.c.forEach((v, kk) => blk(kk % N, (kk / N) | 0, v));
+        const [ax, ay] = appleAt(a);
+        const appleOnTop = k === 0;
+        if (!appleOnTop) for (const [x, y, v] of appleCells(ax, ay)) if (appleClip(st, x, y)) blk(x, y, v);
+        st.front.c.forEach((v, kk) => blk(kk % N, (kk / N) | 0, v));
+        if (appleOnTop) for (const [x, y, v] of appleCells(ax, ay)) blk(x, y, v);
+        for (const c of crumbs) {
+          const dt = t - c.t0;
+          if (dt < 0 || dt > 0.9) continue;
+          ctx.globalAlpha = 1 - dt / 0.9;
+          blk(Math.round(17.5 + c.vx * dt), Math.round(17 + c.vy * dt + 12 * dt * dt), c.col);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    function finish() {
+      if (!running) return;
+      running = false;
+      const el = $("intro");
+      el.classList.add("fading");
+      clearTimeout(safetyTimer);
+      hideTimer = setTimeout(() => el.classList.add("hidden"), 520);
+    }
+    // timed by the real clock, so it always finishes on schedule even if frames are throttled
+    function tick(now) {
+      if (!running) return;
+      t = (now - last) / 1000;
+      draw();
+      if (t >= T.fade0) $("intro").classList.add("fading");   // the overlay itself fades, revealing the menu
+      if (t >= T.end) return finish();
+      requestAnimationFrame(tick);
+    }
+
+    $("intro").addEventListener("pointerdown", () => finish());
+    return {
+      play() {
+        if (running) return;
+        clearTimeout(hideTimer);
+        colors = themeColors();
+        prepare();
+        t = 0;
+        running = true;
+        $("intro").classList.remove("hidden", "fading");
+        $("intro").style.background = colors.bg;
+        draw();
+        last = performance.now();
+        requestAnimationFrame(tick);
+        safetyTimer = setTimeout(finish, (T.end + 0.6) * 1000); // safety net if animation frames stop entirely
+      },
+      active: () => running,
+      skip: finish,
+    };
+  })();
+
   // ---------- Blackjack: the Nokia bonus game (unlocked by Jörmungandr, opened with the red hang-up key) ----------
   const BJ = { W: 100, H: 106, S: 3, BG: "#9eaa87", FG: "#1c2416", SHADOW: "rgba(28,36,22,0.16)" };
   // 3x5 pixel font, rows packed left to right
@@ -1882,6 +2151,7 @@
   // ---------- Input ----------
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   function act(a) {
+    if (loadingScreen.active()) return loadingScreen.skip();
     if (crtOff) return;
     if (bj.open) return bjAct(a);
     // Nokia keys: soft keys act like Esc / select; the red hang-up key opens the bonus game once it is unlocked.
@@ -1933,6 +2203,7 @@
   // Shortcuts for testing easter eggs, only in the personal edition.
   if (EDITION === "personal") Object.assign(KEYS, { v: "egg", V: "egg", p: "poison", P: "poison" });
   document.addEventListener("keydown", e => {
+    if (loadingScreen.active() && !e.metaKey && !e.ctrlKey) { e.preventDefault(); return loadingScreen.skip(); } // any key skips it
     const a = KEYS[e.key];
     if (!a || e.metaKey || e.ctrlKey) return;
     e.preventDefault();
@@ -1965,6 +2236,7 @@
   resetBoard();
   applyTheme();
   showMenu();
+  loadingScreen.play();
 })();
 </script>
 </body>
