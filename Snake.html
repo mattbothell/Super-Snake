@@ -188,6 +188,7 @@
   .art-trophy { width: 30px; height: 28px; color: #ffd23f; --art2: #b8860b; }
   .art-apple { width: 20px; height: 20px; color: #e83a3a; --art2: #4caf50; }
   .art-star { width: 20px; height: 20px; color: #ffd23f; --art2: #ffd23f; }
+  .art-ouroboros { width: 20px; height: 20px; color: #7fd36b; --art2: #7fd36b; }
   .theme-nokia .art { color: var(--fg); --art2: var(--fg); }
   .theme-crt .art { color: var(--phosphor); --art2: var(--phosphor); filter: drop-shadow(0 0 calc(4px * var(--glow, 1)) var(--phosphor)); }
   .ach-tree { width: 100%; max-width: 540px; text-align: left; margin: 6px 0; }
@@ -220,7 +221,7 @@
   .theme-crt .ach-root > .ach-head { font-size: 16px; }
   .theme-nokia .ach-title { gap: 6px; }
   .theme-nokia .art-trophy { width: 16px; height: 15px; }
-  .theme-nokia .art-apple, .theme-nokia .art-star { width: 12px; height: 12px; }
+  .theme-nokia .art-apple, .theme-nokia .art-star, .theme-nokia .art-ouroboros { width: 12px; height: 12px; }
   .theme-nokia .ach-root > .ach-head { font-size: 12px; letter-spacing: 1px; gap: 5px; }
   .theme-nokia .ach-root > .ach-head small { font-size: 9px; }
   .theme-nokia .ach-name { font-size: 11px; }
@@ -232,6 +233,10 @@
   .theme-nokia .ach-snake { height: 12px; }
   .theme-nokia .ach-snake svg { height: 12px; width: 120px; }
   @media (prefers-reduced-motion: reduce) { .ach-snake svg { animation: none; transform: translateX(20px); } }
+
+  /* ---------- Blackjack (Nokia bonus game) ---------- */
+  #bj { position: absolute; inset: 6px; z-index: 7; display: flex; align-items: center; justify-content: center; background: #9eaa87; border-radius: 2px; }
+  #bjCanvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
 
   /* ---------- Easter eggs ---------- */
   #sms {
@@ -624,6 +629,7 @@
           <div>hey bby &lt;3 wyd?</div>
         </div>
         <div id="pcload" class="crt-only">Error: PC LOAD LETTER</div>
+        <div id="bj" class="nokia-only hidden"><canvas id="bjCanvas" width="300" height="318" aria-label="Blackjack"></canvas></div>
         <div class="crt-overlay crt-only"><i class="scan"></i><i class="grain"></i><i class="roll"></i><i class="flicker"></i></div>
       </div>
     </div>
@@ -641,8 +647,8 @@
 
     <!-- Keys sit at fixed spots on the body: soft keys + rocker inside the band, call keys outside it, then the fanned numpad. -->
     <div class="keypad nokia-only">
-      <button class="nk-key soft" data-act="escape" title="Menu" style="left:118px;top:458px;--r:-14deg"></button>
-      <button class="nk-key soft" data-act="select" title="Select" style="left:322px;top:458px;--r:14deg"></button>
+      <button class="nk-key soft" data-act="softL" title="Left soft key" style="left:118px;top:458px;--r:-14deg"></button>
+      <button class="nk-key soft" data-act="softR" title="Right soft key" style="left:322px;top:458px;--r:14deg"></button>
       <button class="nk-key rock-up" data-act="up" style="left:220px;top:456px">
         <svg width="18" height="10" viewBox="0 0 18 10"><polyline points="2,8 9,2 16,8" fill="none" stroke="#2b2516" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -652,7 +658,7 @@
       <button class="nk-key call" data-act="select" title="Start / pause" style="left:62px;top:552px;--r:26deg">
         <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#1f8a2e" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
       </button>
-      <button class="nk-key call" data-act="escape" title="Menu" style="left:378px;top:552px;--r:-26deg">
+      <button class="nk-key call" data-act="hangup" title="Hang up" style="left:378px;top:552px;--r:-26deg">
         <svg width="18" height="18" viewBox="0 0 24 24" style="transform:rotate(135deg)"><path fill="#c42020" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
       </button>
 
@@ -695,6 +701,8 @@
   const TREES = [
     { id: "classic", name: "CLASSIC", icon: "apple" },
     { id: "super", name: "SUPER SNAKE", requires: "fast-50", icon: "star" },
+    // opens once every achievement above is earned
+    { id: "secret", name: "SECRET", requires: ["getting-started", "fast-50", "lazy-day", "five-on-it", "insatiable", "patience", "king-cobra", "boomslang"], icon: "ouroboros" },
   ];
   const ACHIEVEMENTS = [
     { id: "getting-started", tree: "classic", name: "Getting Started", desc: "Score 100 in the default game mode", unlocks: "theme:nokia" },
@@ -705,11 +713,15 @@
     { id: "patience", tree: "super", name: "Patience is a virtue", desc: "Score 75 without collecting any power-ups", unlocks: "crt:3" },
     { id: "king-cobra", tree: "super", name: "King Cobra", desc: "Score 200 in Super Snake", unlocks: "colors:crt" },
     { id: "boomslang", tree: "super", name: "Boomslang", desc: "Eat the poison apple and live", unlocks: "skin:iridescent" },
+    // `reward` / `rewardEarned` replace the usual "Unlocks: …" line
+    { id: "jormungandr", tree: "secret", name: "Jörmungandr", desc: "Score 100 in Super Snake on the Nokia theme", unlocks: "game:blackjack",
+      reward: "It's a secret!", rewardEarned: "Hang up the phone for a bonus game" },
   ];
   const UNLOCK_NAMES = {
     "theme:nokia": "Nokia theme", "theme:crt": "CRT theme", colors: "Custom colors (Classic theme)",
     "crt:1": "Amber CRT colors", "crt:2": "Paper White CRT colors", "crt:3": "Navy CRT colors",
     "colors:crt": "Custom colors (CRT theme)", "skin:iridescent": "Iridescent snake (any theme)",
+    "game:blackjack": "Bonus game",
   };
   // Little pixel-art sprites (1 = main color, 2 = second color)
   const ART = {
@@ -717,6 +729,7 @@
              "00001110000", "00001110000", "00011111000", "00111111100"],
     apple: ["000002200", "000022000", "011101110", "111111111", "111111111", "111111111", "111111111", "011111110", "001101100"],
     star: ["000010000", "000111000", "000111000", "111111111", "011111110", "001111100", "011111110", "011000110", "110000011"],
+    ouroboros: ["001111100", "011000110", "110000011", "100000001", "100000001", "100000011", "110000110", "011001100", "001111000"],
     envelope: ["11111111111111", "11000000000011", "10100000000101", "10010000001001", "10001100110001", "10000011000001",
                "10000000000001", "11111111111111"],
   };
@@ -790,7 +803,7 @@
     const a = ACHIEVEMENTS.find(x => x.unlocks === feature);
     return !a || allUnlocked() || !!earned[a.id];
   };
-  const treeOpen = t => !t.requires || !!earned[t.requires];
+  const treeOpen = t => !t.requires || [].concat(t.requires).every(id => earned[id]);
   const achAvailable = a => treeOpen(TREES.find(t => t.id === a.tree)) && (!a.requires || !!earned[a.requires]);
   const crtScheme = () => isUnlocked("crt:" + settings.crtScheme) ? settings.crtScheme : 0;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -809,7 +822,7 @@
     if (achShowing || !achQueue.length) return;
     const a = achQueue.shift();
     achShowing = true;
-    toast(`ACHIEVEMENT: ${a.name}`, `${UNLOCK_NAMES[a.unlocks]} unlocked`, 2800, true);
+    toast(`ACHIEVEMENT: ${a.name}`, a.rewardEarned || `${UNLOCK_NAMES[a.unlocks]} unlocked`, 2800, true);
     setTimeout(() => { achShowing = false; showNextAchievement(); }, 3000);
   }
 
@@ -946,15 +959,18 @@
       return `<li class="${status}">
         <div class="ach-name"><span class="ach-mark">${mark}</span>${esc(a.name)}</div>
         ${a.hidden ? "" : `<div class="ach-desc">${esc(a.desc)}</div>`}
-        <div class="ach-reward">Unlocks: ${esc(UNLOCK_NAMES[a.unlocks])}</div>
+        <div class="ach-reward">${esc(a.reward ? (earned[a.id] ? a.rewardEarned : a.reward) : "Unlocks: " + UNLOCK_NAMES[a.unlocks])}</div>
         ${kids.length ? `<ul class="ach-list ${earned[a.id] ? "open" : ""}">${kids.map(node).join("")}</ul>` : ""}
       </li>`;
     };
     $("achTree").innerHTML = TREES.map(t => {
       const roots = ACHIEVEMENTS.filter(a => a.tree === t.id && (!a.requires || achById(a.requires).tree !== t.id));
-      const gate = treeOpen(t) ? "" : `<small>${LOCK_SVG} opens after “${esc(achById(t.requires).name)}”</small>`;
+      const gateText = () => Array.isArray(t.requires)
+        ? `opens after all ${t.requires.length} achievements above`
+        : `opens after “${esc(achById(t.requires).name)}”`;
+      const gate = treeOpen(t) ? "" : `<small>${LOCK_SVG} ${gateText()}</small>`;
       return `<div class="ach-root ${treeOpen(t) ? "" : "locked"}">
-        <div class="ach-head"><span class="art ${t.icon === "star" ? "art-star" : "art-apple"}">${pixelArt(ART[t.icon])}</span>${t.name}${gate}</div>
+        <div class="ach-head"><span class="art art-${t.icon}">${pixelArt(ART[t.icon])}</span>${t.name}${gate}</div>
         <ul class="ach-list ${treeOpen(t) ? "open" : ""}">${roots.map(node).join("")}</ul>
       </div>`;
     }).join("");
@@ -1198,6 +1214,7 @@
     if (isSuper()) {
       if (score >= 75 && run.powerUps === 0) award("patience");
       if (score >= 200) award("king-cobra");
+      if (score >= 100 && settings.theme === "nokia") award("jormungandr");
       return;
     }
     if (appleCount() !== 1) return; // Classic achievements count only with the standard single apple
@@ -1617,10 +1634,255 @@
     })));
   }
 
+  // ---------- Blackjack: the Nokia bonus game (unlocked by Jörmungandr, opened with the red hang-up key) ----------
+  const BJ = { W: 100, H: 106, S: 3, BG: "#9eaa87", FG: "#1c2416", SHADOW: "rgba(28,36,22,0.16)" };
+  // 3x5 pixel font, rows packed left to right
+  const BJ_FONT = {
+    A: "010101111101101", B: "110101110101110", C: "011100100100011", D: "110101101101110", E: "111100110100111",
+    F: "111100110100100", G: "011100101101011", H: "101101111101101", I: "111010010010111", J: "001001001101010",
+    K: "101101110101101", L: "100100100100111", M: "101111111101101", N: "110101101101101", O: "010101101101010",
+    P: "110101110100100", Q: "010101101110011", R: "110101110101101", S: "011100010001110", T: "111010010010010",
+    U: "101101101101111", V: "101101101101010", W: "101101111111101", X: "101101010101101", Y: "101101010010010",
+    Z: "111001010100111", 0: "111101101101111", 1: "010110010010111", 2: "110001010100111", 3: "110001010001110",
+    4: "101101111001001", 5: "111100110001110", 6: "011100111101111", 7: "111001010010010", 8: "111101111101111",
+    9: "111101111001110", "?": "110001010000010", "!": "010010010000010", " ": "000000000000000",
+  };
+  const BJ_SUITS = {
+    S: ["00100", "01110", "11111", "00100", "01110"], H: ["01010", "11111", "11111", "01110", "00100"],
+    D: ["00100", "01110", "11111", "01110", "00100"], C: ["01110", "01110", "11111", "00100", "01110"],
+  };
+  const bj = {
+    open: false, screen: "select", choice: 1, deck: [], player: [], dealer: [], result: null, timer: null,
+    stats: store.get("snake.blackjack", { w: 0, l: 0 }),
+  };
+
+  function bjOpen() {
+    if (state === "playing") togglePause();
+    bj.open = true;
+    bj.screen = "select";
+    bj.choice = 1;
+    $("bj").classList.remove("hidden");
+    bjDraw();
+  }
+  function bjClose() {
+    clearTimeout(bj.timer);
+    bj.open = false;
+    $("bj").classList.add("hidden");
+  }
+
+  function bjValue(cards) {
+    let total = 0, aces = 0;
+    for (const c of cards) {
+      if (c.r === "A") { total += 11; aces++; }
+      else total += "JQK".includes(c.r) ? 10 : +c.r;
+    }
+    while (total > 21 && aces) { total -= 10; aces--; }
+    return total;
+  }
+
+  function bjDeal() {
+    clearTimeout(bj.timer);
+    const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+    bj.deck = [];
+    for (const s of "SHDC") for (const r of ranks) bj.deck.push({ r, s });
+    for (let i = bj.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bj.deck[i], bj.deck[j]] = [bj.deck[j], bj.deck[i]];
+    }
+    bj.player = [bj.deck.pop(), bj.deck.pop()];
+    bj.dealer = [bj.deck.pop(), bj.deck.pop()];
+    bj.screen = "play";
+    bj.result = null;
+    const p = bjValue(bj.player) === 21, d = bjValue(bj.dealer) === 21;
+    if (p || d) bjFinish(p && d ? "push" : p ? "blackjack" : "lose");
+    bjDraw();
+  }
+
+  function bjHit() {
+    bj.player.push(bj.deck.pop());
+    const v = bjValue(bj.player);
+    if (v > 21) bjFinish("bust");
+    else if (v === 21) return bjStand();
+    bjDraw();
+  }
+
+  // Dealer reveals the hole card and draws to 17, one card at a time.
+  function bjStand() {
+    bj.screen = "dealer";
+    bjDraw();
+    const turn = () => {
+      if (bjValue(bj.dealer) < 17) {
+        bj.dealer.push(bj.deck.pop());
+        bjDraw();
+        bj.timer = setTimeout(turn, 650);
+        return;
+      }
+      const p = bjValue(bj.player), d = bjValue(bj.dealer);
+      bjFinish(d > 21 ? "dealerbust" : p > d ? "win" : p < d ? "lose" : "push");
+      bjDraw();
+    };
+    bj.timer = setTimeout(turn, 650);
+  }
+
+  function bjFinish(result) {
+    bj.result = result;
+    bj.screen = "result";
+    if (["win", "blackjack", "dealerbust"].includes(result)) bj.stats.w++;
+    if (["lose", "bust"].includes(result)) bj.stats.l++;
+    store.set("snake.blackjack", bj.stats);
+  }
+
+  function bjAct(a) {
+    const ok = ["softR", "select", "start", "pause"].includes(a);
+    if (a === "hangup" || a === "escape") {
+      if (bj.screen === "select") return bjClose();
+      clearTimeout(bj.timer);
+      bj.screen = "select";
+      return bjDraw();
+    }
+    if (bj.screen === "select") {
+      if (a === "up" || a === "down") { bj.choice = 1 - bj.choice; return bjDraw(); }
+      if (a === "softL") return bjClose();
+      if (ok) return bj.choice === 0 ? bjClose() : bjDeal();
+    } else if (bj.screen === "play") {
+      if (a === "softL" || a === "left") bjHit();
+      else if (a === "softR" || a === "right") bjStand();
+    } else if (bj.screen === "result") {
+      if (ok || a === "right") bjDeal();
+      else if (a === "softL" || a === "left") { bj.screen = "select"; bjDraw(); }
+    }
+  }
+
+  // Pixel drawing on the LCD: collect on/off pixels, then paint with the same faint LCD shadow as the snake.
+  function bjDraw() {
+    const { W, H, S } = BJ;
+    const c = $("bjCanvas").getContext("2d");
+    const px = new Map();
+    const set = (x, y, v = 1) => { if (x >= 0 && y >= 0 && x < W && y < H) px.set(x + "," + y, v); };
+    const rect = (x, y, w, h, v = 1) => { for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) set(x + i, y + j, v); };
+    const tw = s => String(s).length * 4 - 1;
+    const text = (s, x, y, inv) => [...String(s)].forEach((ch, i) => {
+      const f = BJ_FONT[ch] || BJ_FONT[" "];
+      for (let k = 0; k < 15; k++) if (f[k] === "1") set(x + i * 4 + (k % 3), y + Math.floor(k / 3), inv ? 0 : 1);
+    });
+    const bmp = (b, x, y, sc = 1, v = 1) => b.forEach((r, j) => [...r].forEach((p, i) => {
+      if (p === "1") rect(x + i * sc, y + j * sc, sc, sc, v);
+    }));
+    const line = (x0, y0, x1, y1) => {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= n; i++) set(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n));
+    };
+    const label = (t, x, y) => { rect(x - 2, y - 2, tw(t) + 4, 9, 0); text(t, x, y); };
+    const banner = (t, y) => { const w = tw(t) + 12, x = Math.round(50 - w / 2); rect(x, y, w, 11); text(t, x + 6, y + 3, true); };
+    const softkeys = (l, r) => { rect(0, 98, W, 8); text(l, 3, 100, true); text(r, W - 3 - tw(r), 100, true); };
+    const topbar = (t, right = "") => { rect(0, 0, W, 9); text(t, right ? 3 : 50 - Math.floor(tw(t) / 2), 2, true); if (right) text(right, W - 3 - tw(right), 2, true); };
+
+    if (bj.screen === "select") {
+      topbar("SELECT GAME");
+      const row = (i, y, icon, name) => {
+        const on = bj.choice === i;
+        if (on) rect(0, y, W, 15);
+        icon(on ? 0 : 1, y);
+        text(name, 22, y + 5, on);
+        if (on) bmp(["10000", "11000", "11100", "11000", "10000"], W - 9, y + 5, 1, 0);
+      };
+      row(0, 19, (v, y) => bmp(ART.apple, 7, y + 3, 1, v), "SNAKE");
+      row(1, 44, (v, y) => bmp(BJ_SUITS.S, 5, y + 3, 2, v), "BLACKJACK");
+      bmp(["00100", "01110", "11111"], 47, 66);
+      bmp(["11111", "01110", "00100"], 47, 72);
+      for (let i = 0; i < 92; i += 2) set(4 + i, 84);
+      text("JORMUNGANDR", 50 - Math.floor(tw("JORMUNGANDR") / 2), 88);
+      softkeys("BACK", "OK");
+    } else {
+      const reveal = bj.screen !== "play";
+      const won = ["win", "blackjack", "dealerbust"].includes(bj.result);
+      const lost = ["lose", "bust"].includes(bj.result);
+      const mood = won ? "sad" : lost ? "grin" : "calm";
+
+      // the table: a rail, then dotted felt
+      for (let x = 0; x < W; x++) { set(x, 39); set(x, 40); }
+      for (let y = 43; y < 98; y += 3) for (let x = (y % 2) * 2; x < W; x += 4) set(x, y);
+
+      // the dealer, sitting across the table in a green-visor eyeshade
+      rect(41, 11, 19, 2); rect(37, 13, 27, 2);
+      for (let y = 15; y < 26; y++) { set(42, y); set(58, y); }
+      set(43, 26); set(57, 26);
+      for (let x = 44; x < 57; x++) set(x, 27);
+      rect(46, 18, 2, 2); rect(53, 18, 2, 2);
+      if (mood === "sad") { set(45, 17); set(55, 17); }
+      set(50, 21); set(50, 22); set(49, 22);
+      if (mood === "sad") { set(46, 25); for (let x = 47; x < 54; x++) set(x, 24); set(54, 25); }
+      else if (mood === "grin") { set(46, 23); for (let x = 47; x < 54; x++) set(x, 24); set(54, 23); set(48, 25); set(50, 25); set(52, 25); }
+      else for (let x = 47; x < 54; x++) set(x, 24);
+      set(47, 28); set(53, 28);
+      bmp(["1100011", "1110111", "1111111", "1110111", "1100011"], 47, 29);
+      line(46, 29, 30, 37); line(54, 29, 70, 37); line(30, 37, 30, 38); line(70, 37, 70, 38);
+      line(46, 31, 49, 38); line(54, 31, 51, 38); set(50, 35); set(50, 37);
+      rect(24, 36, 10, 3); rect(66, 36, 10, 3);
+
+      // dealer's cards on the table (hole card face down until the reveal)
+      const dn = bj.dealer.length, dStep = dn > 1 ? Math.min(13, Math.floor((80 - 11) / (dn - 1))) : 0;
+      const dx0 = Math.round(50 - (11 + (dn - 1) * dStep) / 2);
+      bj.dealer.forEach((card, i) => {
+        const x = dx0 + i * dStep, y = 44;
+        rect(x, y, 11, 14, 0);
+        for (let k = 1; k < 10; k++) { set(x + k, y); set(x + k, y + 13); }
+        for (let k = 1; k < 13; k++) { set(x, y + k); set(x + 10, y + k); }
+        if (i === 1 && !reveal) {
+          for (let a = 2; a < 9; a++) for (let b = 2; b < 12; b++) if ((a + b) % 2 === 0) set(x + a, y + b);
+        } else {
+          text(card.r === "10" ? "10" : card.r, x + (card.r === "10" ? 1 : 2), y + 2);
+          bmp(BJ_SUITS[card.s], x + 3, y + 7);
+        }
+      });
+      const dTotal = reveal ? String(bjValue(bj.dealer)) : "?";
+      label(dTotal, W - 4 - tw(dTotal), 47);
+
+      // your hand, fanned out at the bottom of the screen
+      const pn = bj.player.length, pStep = pn > 1 ? Math.min(15, Math.floor((96 - 23) / (pn - 1))) : 0;
+      const px0 = Math.round(50 - (23 + (pn - 1) * pStep) / 2);
+      bj.player.forEach((card, i) => {
+        const x = px0 + i * pStep, y = 64 + Math.round(Math.abs(i - (pn - 1) / 2) * 4);
+        rect(x, y, 23, 34, 0);
+        for (let k = 1; k < 22; k++) set(x + k, y);
+        for (let k = 1; k < 34; k++) { set(x, y + k); set(x + 22, y + k); }
+        text(card.r, x + 2, y + 2);
+        bmp(BJ_SUITS[card.s], x + 2, y + 8);
+        bmp(BJ_SUITS[card.s], x + 7, y + 15, 2);
+      });
+      const pTotal = String(bjValue(bj.player));
+
+      topbar("BLACKJACK", `W${bj.stats.w} L${bj.stats.l}`);
+      if (bj.screen === "result") {
+        const BANNERS = { win: "YOU WIN!", blackjack: "BLACKJACK!", dealerbust: "DEALER BUST!", lose: "DEALER WINS", bust: "BUST!", push: "PUSH" };
+        banner(BANNERS[bj.result], 58);
+        label(pTotal, W - 4 - tw(pTotal), 70);
+        softkeys("MENU", "DEAL");
+      } else {
+        label("YOU " + pTotal, 3, 58);
+        if (bj.screen === "play") softkeys("HIT", "STAND"); else softkeys("", "");
+      }
+    }
+
+    c.fillStyle = BJ.BG;
+    c.fillRect(0, 0, W * S, H * S);
+    c.fillStyle = BJ.SHADOW;
+    for (const [k, v] of px) if (v) { const [x, y] = k.split(",").map(Number); c.fillRect(x * S + 1, y * S + 1, S, S); }
+    for (const [k, v] of px) { const [x, y] = k.split(",").map(Number); c.fillStyle = v ? BJ.FG : BJ.BG; c.fillRect(x * S, y * S, S, S); }
+  }
+
   // ---------- Input ----------
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   function act(a) {
     if (crtOff) return;
+    if (bj.open) return bjAct(a);
+    // Nokia keys: soft keys act like Esc / select; the red hang-up key opens the bonus game once it is unlocked.
+    if (a === "softL") a = "escape";
+    if (a === "softR") a = "select";
+    if (a === "hangup") {
+      if (isUnlocked("game:blackjack") && state !== "intro") return bjOpen();
+      a = "escape";
+    }
     if (!ui.achievements.classList.contains("hidden")) {
       if (a === "escape" || a === "select" || a === "start") show("menu");
       if (a === "up" || a === "down") ui.achievements.scrollBy({ top: a === "up" ? -40 : 40, behavior: "smooth" });
