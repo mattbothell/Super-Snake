@@ -179,25 +179,77 @@
   .theme-crt .lock-btn { top: 6px; right: 6px; width: 26px; height: 26px; }
   .theme-nokia #menu .btn.secondary { margin-left: 4px; }
 
-  .ach-tree { width: 100%; max-width: 460px; text-align: left; margin-bottom: 4px; }
-  .ach-root { margin: 6px 0 10px; }
-  .ach-root > .ach-head { font-weight: bold; font-size: 15px; letter-spacing: 2px; color: var(--accent); }
+  /* Achievement trees: paths that are still locked are thin dashed lines; open paths are solid and bold. */
+  #achievements { justify-content: flex-start; }
+  .ach-title { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 4px; }
+  .ach-title h2 { margin: 0; }
+  .art { display: inline-block; line-height: 0; }
+  .art svg { display: block; width: 100%; height: 100%; shape-rendering: crispEdges; }
+  .art-trophy { width: 30px; height: 28px; color: #ffd23f; --art2: #b8860b; }
+  .art-apple { width: 20px; height: 20px; color: #e83a3a; --art2: #4caf50; }
+  .art-star { width: 20px; height: 20px; color: #ffd23f; --art2: #ffd23f; }
+  .theme-nokia .art { color: var(--fg); --art2: var(--fg); }
+  .theme-crt .art { color: var(--phosphor); --art2: var(--phosphor); filter: drop-shadow(0 0 calc(4px * var(--glow, 1)) var(--phosphor)); }
+  .ach-tree { width: 100%; max-width: 540px; text-align: left; margin: 6px 0; }
+  .ach-root { margin: 10px 0 14px; }
+  .ach-root > .ach-head { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 19px; letter-spacing: 3px; color: var(--accent); }
   .ach-root.locked > .ach-head { color: var(--muted); }
-  .ach-root > .ach-head small { font-weight: normal; letter-spacing: 0; color: var(--muted); font-size: 11px; margin-left: 6px; }
-  .ach-list { list-style: none; margin: 2px 0 0 6px; padding: 0 0 0 14px; border-left: 1px dashed var(--border); }
-  .ach-list li { position: relative; padding: 4px 0 4px 6px; }
-  .ach-list li::before { content: ""; position: absolute; left: -14px; top: 12px; width: 16px; border-top: 1px dashed var(--border); }
-  .ach-name { font-weight: bold; font-size: 13px; }
-  .ach-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .ach-reward { font-size: 11px; margin-top: 1px; }
+  .ach-root.locked > .ach-head .art { opacity: 0.45; }
+  .ach-root > .ach-head small { font-weight: normal; letter-spacing: 0; color: var(--muted); font-size: 13px; }
+  .ach-list { list-style: none; margin: 4px 0 0 9px; padding: 0 0 0 20px; border-left: 2px dashed color-mix(in srgb, var(--muted) 70%, transparent); }
+  .ach-list.open { border-left: 3px solid var(--accent); }
+  .ach-list li { position: relative; padding: 7px 0 7px 6px; }
+  .ach-list li::before { content: ""; position: absolute; left: -20px; top: 17px; width: 22px; border-top: 2px dashed color-mix(in srgb, var(--muted) 70%, transparent); }
+  .ach-list li.available::before, .ach-list li.earned::before { border-top: 3px solid var(--accent); }
+  .ach-list.open > li::before { left: -21px; }
+  .ach-name { font-weight: bold; font-size: 17px; }
+  .ach-desc { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .ach-reward { font-size: 14px; margin-top: 2px; }
   .ach-list li.earned > .ach-name { color: var(--accent); }
-  .ach-list li.locked > .ach-name, .ach-list li.locked > .ach-reward { opacity: 0.5; }
-  .ach-mark { display: inline-block; width: 1.2em; }
-  .theme-nokia .ach-root > .ach-head { font-size: 11px; letter-spacing: 1px; }
-  .theme-nokia .ach-name { font-size: 10px; }
-  .theme-nokia .ach-desc, .theme-nokia .ach-reward, .theme-nokia .locked-note { font-size: 9px; }
-  .theme-nokia .ach-list { padding-left: 10px; }
-  .theme-nokia .ach-list li::before { left: -10px; width: 12px; }
+  .ach-list li.locked > .ach-name, .ach-list li.locked > .ach-desc, .ach-list li.locked > .ach-reward { opacity: 0.5; }
+  .ach-mark { display: inline-block; width: 1.3em; }
+  .ach-snake { width: 100%; max-width: 540px; height: 22px; overflow: hidden; position: relative; margin: 2px 0 6px; flex: none; }
+  .ach-snake svg { position: absolute; left: 0; top: 0; height: 22px; width: 220px; animation: slither 7s steps(36) infinite; shape-rendering: crispEdges; }
+  .ach-snake .seg-fill { fill: var(--accent); }
+  .ach-snake .apple-fill { fill: #e83a3a; }
+  .theme-nokia .ach-snake .apple-fill { fill: var(--fg); }
+  .theme-crt .ach-snake .apple-fill { fill: var(--phosphor); }
+  @keyframes slither { from { transform: translateX(-230px); } to { transform: translateX(560px); } }
+  .theme-crt .ach-name { font-size: 15px; }
+  .theme-crt .ach-desc, .theme-crt .ach-reward { font-size: 12px; }
+  .theme-crt .ach-root > .ach-head { font-size: 16px; }
+  .theme-nokia .ach-title { gap: 6px; }
+  .theme-nokia .art-trophy { width: 16px; height: 15px; }
+  .theme-nokia .art-apple, .theme-nokia .art-star { width: 12px; height: 12px; }
+  .theme-nokia .ach-root > .ach-head { font-size: 12px; letter-spacing: 1px; gap: 5px; }
+  .theme-nokia .ach-root > .ach-head small { font-size: 9px; }
+  .theme-nokia .ach-name { font-size: 11px; }
+  .theme-nokia .ach-desc, .theme-nokia .ach-reward, .theme-nokia .locked-note { font-size: 10px; }
+  .theme-nokia .ach-list { margin-left: 5px; padding-left: 12px; }
+  .theme-nokia .ach-list li { padding: 4px 0 4px 4px; }
+  .theme-nokia .ach-list li::before { left: -12px; top: 11px; width: 14px; }
+  .theme-nokia .ach-list.open > li::before { left: -13px; }
+  .theme-nokia .ach-snake { height: 12px; }
+  .theme-nokia .ach-snake svg { height: 12px; width: 120px; }
+  @media (prefers-reduced-motion: reduce) { .ach-snake svg { animation: none; transform: translateX(20px); } }
+
+  /* ---------- Easter eggs ---------- */
+  #sms {
+    position: absolute; top: 6px; left: 6px; right: 6px; z-index: 6; pointer-events: none;
+    background: var(--fg); color: #9eaa87; padding: 4px 7px 5px; border-radius: 2px;
+    font-size: 11px; line-height: 1.35; transform: translateY(-140%); transition: transform 0.35s steps(5);
+  }
+  #sms.show { transform: none; }
+  #sms .sms-from { display: flex; align-items: center; gap: 5px; font-weight: bold; }
+  #sms .sms-from .art { width: 14px; height: 10px; color: #9eaa87; --art2: #9eaa87; }
+  #pcload {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 9; pointer-events: none;
+    padding: 5px 12px; white-space: nowrap; font-size: 17px; font-weight: bold; letter-spacing: 2px;
+    background: var(--phosphor); color: #000; text-shadow: none; opacity: 0;
+    box-shadow: 0 0 calc(14px * var(--glow, 1)) var(--phosphor);
+  }
+  #pcload.flash { animation: errflash 2s steps(1) forwards; }
+  @keyframes errflash { 0% { opacity: 1; } 15% { opacity: 0; } 30% { opacity: 1; } 45% { opacity: 0; } 60% { opacity: 1; } 80%, 100% { opacity: 0; } }
   #toast small { display: block; font-size: 0.75em; font-weight: normal; letter-spacing: 1px; margin-top: 2px; }
 
   /* ---------- Window controls (Mac app, device themes) ---------- */
@@ -508,6 +560,11 @@
                     <span id="appleCountLabel"></span>
                   </div>
                   <div class="note" id="superApplesNote">Super Snake always uses 1 apple</div>
+                  <div class="row"><span>Snake skin</span>
+                    <div class="seg" data-setting="skin">
+                      <button data-v="normal">Normal</button><button data-v="iridescent">Iridescent</button>
+                    </div>
+                  </div>
                   <div class="row" id="resetRow" style="justify-content:flex-end">
                     <button class="link" id="resetColors">Reset colors to default</button>
                   </div>
@@ -523,9 +580,22 @@
 
             <!-- Achievements -->
             <div class="overlay hidden" id="achievements">
-              <h2>ACHIEVEMENTS</h2>
+              <div class="ach-title"><span class="art art-trophy" data-art="trophy"></span><h2>ACHIEVEMENTS</h2><span class="art art-trophy" data-art="trophy"></span></div>
               <div class="sub" id="achCount"></div>
               <div class="ach-tree" id="achTree"></div>
+              <div class="ach-snake" aria-hidden="true">
+                <svg viewBox="0 0 110 11">
+                  <g class="seg-fill">
+                    <rect x="0" y="5" width="8" height="5"/><rect x="9" y="3" width="8" height="5"/><rect x="18" y="1" width="8" height="5"/>
+                    <rect x="27" y="3" width="8" height="5"/><rect x="36" y="5" width="8" height="5"/><rect x="45" y="3" width="8" height="5"/>
+                    <rect x="54" y="1" width="10" height="7"/>
+                  </g>
+                  <rect x="60" y="2" width="2" height="2" fill="#000"/>
+                  <rect x="65" y="4" width="4" height="1" class="apple-fill"/><rect x="69" y="3" width="1" height="1" class="apple-fill"/><rect x="69" y="5" width="1" height="1" class="apple-fill"/>
+                  <g class="apple-fill"><rect x="96" y="3" width="8" height="7"/><rect x="95" y="4" width="10" height="5"/></g>
+                  <rect x="99" y="0" width="2" height="3" class="seg-fill"/>
+                </svg>
+              </div>
               <button class="btn secondary" id="achBack">BACK</button>
             </div>
 
@@ -544,11 +614,16 @@
                 <button class="btn" id="againBtn">PLAY AGAIN</button>
                 <button class="btn secondary" id="menuBtn">MENU</button>
               </div>
-              <div class="help">Enter to play again · Esc for menu</div>
+              <div class="help">Enter or Space to play again · Esc for menu</div>
             </div>
           </div>
         </div>
         <div id="osd" class="crt-only"></div>
+        <div id="sms" class="nokia-only">
+          <div class="sms-from"><span class="art" data-art="envelope"></span>(678) 999-8212</div>
+          <div>hey bby &lt;3 wyd?</div>
+        </div>
+        <div id="pcload" class="crt-only">Error: PC LOAD LETTER</div>
         <div class="crt-overlay crt-only"><i class="scan"></i><i class="grain"></i><i class="roll"></i><i class="flicker"></i></div>
       </div>
     </div>
@@ -604,7 +679,7 @@
   const SPEEDS = { slow: 140, medium: 95, fast: 60 };             // ms per step
   const THEMES = ["classic", "nokia", "crt"];
   const NOKIA = { bg: "#9eaa87", fg: "#1c2416" };
-  const DEFAULTS = { theme: "classic", size: "medium", speed: "medium", bg: "#000000", snake: "#6ddb4c", apple: "#e83a3a", apples: 1, crtFlicker: 2, crtScheme: 0, crtGlow: 4, mode: "normal", unlockAll: true };
+  const DEFAULTS = { theme: "classic", size: "medium", speed: "medium", bg: "#000000", snake: "#6ddb4c", apple: "#e83a3a", apples: 1, crtFlicker: 2, crtScheme: 0, crtGlow: 4, mode: "normal", unlockAll: true, skin: "normal" };
   // Super Snake: each apple eaten has a 10% chance of a power-up star, and (separately) a 4% chance of a shield star.
   const POWER_CHANCE = 0.10, SHIELD_CHANCE = 0.04;
   const POWERS = ["near", "line", "four", "big"];
@@ -618,8 +693,8 @@
   // and a whole tree opens once its own `requires` is earned. `hidden: true` shows the name only.
   // `unlocks` names the customization it unlocks (see UNLOCK_NAMES).
   const TREES = [
-    { id: "classic", name: "CLASSIC" },
-    { id: "super", name: "SUPER SNAKE", requires: "fast-50" },
+    { id: "classic", name: "CLASSIC", icon: "apple" },
+    { id: "super", name: "SUPER SNAKE", requires: "fast-50", icon: "star" },
   ];
   const ACHIEVEMENTS = [
     { id: "getting-started", tree: "classic", name: "Getting Started", desc: "Score 100 in the default game mode", unlocks: "theme:nokia" },
@@ -628,11 +703,30 @@
     { id: "five-on-it", tree: "super", name: "I got 5 on it", desc: "Collect 5 power-ups uninterrupted", unlocks: "crt:1" },
     { id: "insatiable", tree: "super", name: "Insatiable", desc: "Collect 3 big apples in a row", unlocks: "crt:2" },
     { id: "patience", tree: "super", name: "Patience is a virtue", desc: "Score 75 without collecting any power-ups", unlocks: "crt:3" },
+    { id: "king-cobra", tree: "super", name: "King Cobra", desc: "Score 200 in Super Snake", unlocks: "colors:crt" },
+    { id: "boomslang", tree: "super", name: "Boomslang", desc: "Eat the poison apple and live", unlocks: "skin:iridescent" },
   ];
   const UNLOCK_NAMES = {
-    "theme:nokia": "Nokia theme", "theme:crt": "CRT theme", colors: "Color customization",
+    "theme:nokia": "Nokia theme", "theme:crt": "CRT theme", colors: "Custom colors (Classic theme)",
     "crt:1": "Amber CRT colors", "crt:2": "Paper White CRT colors", "crt:3": "Navy CRT colors",
+    "colors:crt": "Custom colors (CRT theme)", "skin:iridescent": "Iridescent snake (any theme)",
   };
+  // Little pixel-art sprites (1 = main color, 2 = second color)
+  const ART = {
+    trophy: ["11111111111", "21111111112", "21111111112", "02111111120", "00211111200", "00021112000",
+             "00001110000", "00001110000", "00011111000", "00111111100"],
+    apple: ["000002200", "000022000", "011101110", "111111111", "111111111", "111111111", "111111111", "011111110", "001101100"],
+    star: ["000010000", "000111000", "000111000", "111111111", "011111110", "001111100", "011111110", "011000110", "110000011"],
+    envelope: ["11111111111111", "11000000000011", "10100000000101", "10010000001001", "10001100110001", "10000011000001",
+               "10000000000001", "11111111111111"],
+  };
+  function pixelArt(rows) {
+    let rects = "";
+    rows.forEach((row, y) => [...row].forEach((v, x) => {
+      if (v !== "0") rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" style="fill:${v === "1" ? "currentColor" : "var(--art2)"}"/>`;
+    }));
+    return `<svg viewBox="0 0 ${rows[0].length} ${rows.length}" aria-hidden="true">${rects}</svg>`;
+  }
   const LOCK_SVG = '<svg class="lock-ico" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>';
   const UNLOCK_SVG = '<svg class="lock-ico" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 9.9-1h-2.1A3 3 0 0 0 9 7v3h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z"/></svg>';
 
@@ -721,10 +815,17 @@
 
   // Switch away from a theme the player hasn't unlocked. Returns true if the theme changed.
   function enforceLocks() {
+    if (!isUnlocked("skin:iridescent")) settings.skin = "normal";
     if (isUnlocked("theme:" + settings.theme)) return false;
     settings.theme = "classic";
     return true;
   }
+  // Which unlockable feature a menu choice needs, if any.
+  const featureFor = (setting, value) =>
+    setting === "theme" ? "theme:" + value : setting === "skin" && value === "iridescent" ? "skin:iridescent" : null;
+  // Custom colors are unlocked per theme: Lazy Day for Classic, King Cobra for the CRT.
+  const colorsFeature = () => settings.theme === "crt" ? "colors:crt" : "colors";
+  const iridescent = () => settings.skin === "iridescent" && isUnlocked("skin:iridescent");
   enforceLocks();
 
   const $ = id => document.getElementById(id);
@@ -775,7 +876,7 @@
     document.querySelectorAll(".seg").forEach(seg => {
       seg.querySelectorAll("button").forEach(b => {
         b.classList.toggle("on", settings[seg.dataset.setting] === b.dataset.v);
-        const feature = seg.dataset.setting === "theme" ? "theme:" + b.dataset.v : null;
+        const feature = featureFor(seg.dataset.setting, b.dataset.v);
         const locked = !!feature && !isUnlocked(feature);
         b.dataset.label ??= b.textContent;
         b.disabled = locked;
@@ -784,9 +885,10 @@
         b.title = locked ? `Earn “${ACHIEVEMENTS.find(a => a.unlocks === feature).name}” to unlock` : "";
       });
     });
-    const colorsLocked = !isUnlocked("colors");
+    const colorsLocked = !isUnlocked(colorsFeature());
     document.querySelector(".colors-row").classList.toggle("is-locked", colorsLocked);
-    $("colorsLocked").innerHTML = `${LOCK_SVG} Earn “Lazy Day” to unlock`;
+    const colorsBy = ACHIEVEMENTS.find(a => a.unlocks === colorsFeature()).name;
+    $("colorsLocked").innerHTML = `${LOCK_SVG} Earn “${esc(colorsBy)}” to unlock`;
     $("resetRow").classList.toggle("hidden", colorsLocked);
     $("lockBtn").classList.toggle("hidden", EDITION !== "personal");
     $("lockBtn").classList.toggle("unlocked", allUnlocked());
@@ -845,15 +947,15 @@
         <div class="ach-name"><span class="ach-mark">${mark}</span>${esc(a.name)}</div>
         ${a.hidden ? "" : `<div class="ach-desc">${esc(a.desc)}</div>`}
         <div class="ach-reward">Unlocks: ${esc(UNLOCK_NAMES[a.unlocks])}</div>
-        ${kids.length ? `<ul class="ach-list">${kids.map(node).join("")}</ul>` : ""}
+        ${kids.length ? `<ul class="ach-list ${earned[a.id] ? "open" : ""}">${kids.map(node).join("")}</ul>` : ""}
       </li>`;
     };
     $("achTree").innerHTML = TREES.map(t => {
       const roots = ACHIEVEMENTS.filter(a => a.tree === t.id && (!a.requires || achById(a.requires).tree !== t.id));
       const gate = treeOpen(t) ? "" : `<small>${LOCK_SVG} opens after “${esc(achById(t.requires).name)}”</small>`;
       return `<div class="ach-root ${treeOpen(t) ? "" : "locked"}">
-        <div class="ach-head">${t.name}${gate}</div>
-        <ul class="ach-list">${roots.map(node).join("")}</ul>
+        <div class="ach-head"><span class="art ${t.icon === "star" ? "art-star" : "art-apple"}">${pixelArt(ART[t.icon])}</span>${t.name}${gate}</div>
+        <ul class="ach-list ${treeOpen(t) ? "open" : ""}">${roots.map(node).join("")}</ul>
       </div>`;
     }).join("");
     show("achievements");
@@ -1049,11 +1151,19 @@
   function eat(item) {
     trackForAchievements(item);
     apples.splice(apples.indexOf(item), 1);
+    const before = score;
     if (item.kind === "apple") { score += 1; grow += 1; rollPowerUp(); }
     else if (item.kind === "big") { score += 4; grow += 4; rollPowerUp(); }
     else if (item.kind === "star") { score += 1; grow += 1; applyPower(item.power); }
     else if (item.kind === "rainbow") { score += 1; grow += 1; shieldActive = true; toast("SHIELD ON"); }
+    else if (item.kind === "poison") {
+      // Only reachable with a shield up (step() ends the game otherwise): the shield is spent and the snake survives.
+      shieldActive = false;
+      toast("POISON SHRUGGED OFF!");
+      award("boomslang");
+    }
     checkScoreAchievements();
+    if (score > before) checkEasterEggs(before);
     // Keep at least one regular apple on the board (multi-apple mode keeps its full count).
     let missing = appleCount() - apples.filter(a => a.kind === "apple").length;
     if (isSuper()) missing = Math.min(missing, 1);
@@ -1063,7 +1173,7 @@
 
   // Called just before an item is eaten (it is still on the board).
   function trackForAchievements(item) {
-    if (!isSuper()) return;
+    if (!isSuper() || item.kind === "poison") return;
     const onBoard = kinds => apples.filter(a => kinds.includes(a.kind)).length;
     if (item.kind === "star" || item.kind === "rainbow") {
       run.powerUps++;
@@ -1087,6 +1197,7 @@
     const { size, speed } = settings;
     if (isSuper()) {
       if (score >= 75 && run.powerUps === 0) award("patience");
+      if (score >= 200) award("king-cobra");
       return;
     }
     if (appleCount() !== 1) return; // Classic achievements count only with the standard single apple
@@ -1095,13 +1206,57 @@
     if (size === "large" && speed === "slow" && score >= 150) award("lazy-day");
   }
 
+  // ---------- Easter eggs ----------
+  // Rolled once at the start of each game.
+  function rollEasterEggs() {
+    $("sms").classList.remove("show");
+    run.eggs = {
+      sms: settings.theme === "nokia" && Math.random() < 0.01,      // text message at 10 points
+      pcLoad: settings.theme === "crt" && Math.random() < 0.05,     // printer error every 10 points
+      poison: isSuper() && Math.random() < 0.01,                    // one poison apple somewhere between 1 and 100 points
+      poisonAt: 1 + Math.floor(Math.random() * 100),
+      smsShown: false, poisonPlaced: false,
+    };
+  }
+
+  function checkEasterEggs(before) {
+    const e = run.eggs;
+    if (!e) return;
+    if (e.sms && !e.smsShown && score >= 10) { e.smsShown = true; showSms(); }
+    if (e.pcLoad && Math.floor(score / 10) > Math.floor(before / 10)) flashPcLoad();
+    if (e.poison && !e.poisonPlaced && score >= e.poisonAt) placePoison();
+  }
+
+  let smsTimer;
+  function showSms() {
+    $("sms").classList.add("show");
+    clearTimeout(smsTimer);
+    smsTimer = setTimeout(() => $("sms").classList.remove("show"), 3500);
+  }
+
+  function flashPcLoad() {
+    const el = $("pcload");
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }
+
+  // The poison apple always sits alongside at least one safe regular apple, and stays until eaten.
+  function placePoison() {
+    if (apples.some(a => a.kind === "poison")) return;
+    if (!apples.some(a => a.kind === "apple")) spawnApple();
+    if (spawnAt("poison") && run.eggs) run.eggs.poisonPlaced = true;
+  }
+
   function start() {
     resetBoard();
+    rollEasterEggs();
     show(null);
     updateHud();
     draw();
     clearInterval(timer);
-    const run = () => {
+    const begin = () => {
+      if (run.eggs.poison) toast("uh oh! Be cautious of the poison apple", "", 2800);
       if (crtOff) { state = "paused"; show("paused"); return; }
       state = "playing";
       timer = setInterval(step, SPEEDS[settings.speed]);
@@ -1109,9 +1264,9 @@
     if (isSuper() && introPending) {
       introPending = false;
       state = "intro";
-      playIntro(() => { draw(); run(); });
+      playIntro(() => { draw(); begin(); });
     } else {
-      run();
+      begin();
     }
   }
 
@@ -1140,11 +1295,15 @@
     }
 
     const item = apples.find(a => cellsOf(a).some(c => same(c, head)));
+    // The poison apple is deadly unless a shield is up.
+    if (item && item.kind === "poison" && !shieldActive) return gameOver();
     // The tail moves out of the way this step unless the snake is growing.
-    const body = item || grow > 0 ? snake : snake.slice(0, -1);
+    const growing = (item && item.kind !== "poison") || grow > 0;
+    const body = growing ? snake : snake.slice(0, -1);
     // ...and running into itself passes straight through (a second crossing still ends the game).
     if (body.some(p => same(p, head))) {
-      if (!shieldActive) return gameOver();
+      // one shield can't cover both a crossing and the poison apple in the same move
+      if (!shieldActive || (item && item.kind === "poison")) return gameOver();
       shieldActive = false;
       shieldUsed = true;
     }
@@ -1211,8 +1370,20 @@
       ctx.fillStyle = color;
       if (it.kind === "big") return bigApple(it, color, o, shadowPass);
       if (it.kind === "star") return star(it, o);
+      if (it.kind === "poison") return poisonApple(it, o, shadowPass);
       theme === "nokia" ? food(it, o) : block(it, o);
     };
+    // Iridescent skin: each segment shifts through the rainbow over time.
+    const t = performance.now();
+    const drawSnake = (color, o = 0) => snake.forEach((p, i) => {
+      if (color === null) {
+        const c = `hsl(${(t * 0.12 + i * 24) % 360}, 90%, ${theme === "nokia" ? 40 : 62}%)`;
+        ctx.fillStyle = c;
+        if (theme === "crt") ctx.shadowColor = c;
+      }
+      block(p, o);
+    });
+    const skin = iridescent() ? null : pal.snake;
 
     if (theme === "nokia") {
       // LCD pixels cast a faint shadow onto the backplane
@@ -1220,10 +1391,10 @@
       const shadow = "rgba(28,36,22,0.16)";
       apples.forEach(a => drawItem(a, shadow, o, true));
       ctx.fillStyle = shadow;
-      snake.forEach(p => block(p, o));
+      drawSnake(shadow, o);
       apples.forEach(a => drawItem(a, pal.apple));
       ctx.fillStyle = pal.snake;
-      snake.forEach(p => block(p));
+      drawSnake(skin);
       return;
     }
 
@@ -1233,8 +1404,44 @@
     apples.forEach(a => drawItem(a, pal.apple));
     if (glow) ctx.shadowBlur = cell * 0.6 * settings.crtGlow / 4;
     ctx.fillStyle = ctx.shadowColor = pal.snake;
-    snake.forEach(p => block(p));
+    drawSnake(skin);
     ctx.shadowBlur = 0;
+  }
+
+  // Poison apple: a purple apple with a little skull (on the LCD, a dark apple with a cut-out skull).
+  function poisonApple(it, o, flat) {
+    const nokia = settings.theme === "nokia";
+    const cx = it.x * cell + cell / 2 + o, cy = it.y * cell + cell * 0.56 + o, r = cell * 0.4;
+    ctx.save();
+    ctx.fillStyle = flat ? ctx.fillStyle : nokia ? NOKIA.fg : "#8e2de2";
+    if (!flat && !nokia) ctx.shadowColor = "#b14dff";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (flat) { ctx.restore(); return; }
+    ctx.shadowBlur = 0;
+    // stem
+    ctx.strokeStyle = nokia ? NOKIA.fg : "#3b2a1a";
+    ctx.lineWidth = Math.max(1.5, cell * 0.08);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.9);
+    ctx.lineTo(cx + cell * 0.08, cy - r * 1.35);
+    ctx.stroke();
+    // skull
+    const bone = nokia ? NOKIA.bg : "#f2f2f2";
+    const s = r * 0.5;
+    ctx.fillStyle = bone;
+    ctx.beginPath();
+    ctx.arc(cx, cy - s * 0.15, s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - s * 0.55, cy + s * 0.5, s * 1.1, s * 0.55);
+    ctx.fillStyle = nokia ? NOKIA.fg : "#8e2de2";
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.4, cy - s * 0.15, s * 0.28, 0, Math.PI * 2);
+    ctx.arc(cx + s * 0.4, cy - s * 0.15, s * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function starPath(c, cx, cy, R, r) {
@@ -1311,7 +1518,7 @@
   // Keep the rainbow star shimmering between game steps.
   let lastAnim = 0;
   (function animate(now) {
-    if (now - lastAnim > 40 && (state === "playing" || state === "paused") && apples.some(a => a.kind === "rainbow")) {
+    if (now - lastAnim > 40 && (state === "playing" || state === "paused") && (iridescent() || apples.some(a => a.kind === "rainbow"))) {
       lastAnim = now;
       draw();
     }
@@ -1381,7 +1588,7 @@
     if (settings.theme === "nokia") return { bg: NOKIA.bg, snake: NOKIA.fg, apple: NOKIA.fg };
     const scheme = settings.theme === "crt" && CRT_SCHEMES[crtScheme()];
     if (scheme && scheme.bg) return scheme;
-    const c = isUnlocked("colors") ? settings : DEFAULTS;
+    const c = isUnlocked(colorsFeature()) ? settings : DEFAULTS;
     return { bg: c.bg, snake: c.snake, apple: c.apple };
   }
 
@@ -1426,7 +1633,18 @@
       if ((x === -last.x && y === -last.y) || (x === last.x && y === last.y)) return;
       if (queue.length < 3) queue.push({ x, y });
     } else if (a === "pause") {
-      togglePause();
+      if (state === "over") start(); else togglePause(); // Space also restarts after a game over
+    } else if (a === "egg") {
+      // personal edition: trigger this theme's easter egg on demand
+      if (settings.theme === "nokia") showSms();
+      else if (settings.theme === "crt") flashPcLoad();
+      else toast("NO EASTER EGG ON THIS THEME");
+    } else if (a === "poison") {
+      // personal edition: drop a poison apple into the current game
+      if (state !== "playing" && state !== "paused") return;
+      placePoison();
+      draw();
+      toast("uh oh! Be cautious of the poison apple", "", 2800);
     } else if (a === "start") {
       if (state === "menu" || state === "over") start();
     } else if (a === "select") {
@@ -1442,6 +1660,8 @@
     2: "up", 8: "down", 4: "left", 6: "right", 5: "select",
     " ": "pause", Enter: "start", Escape: "escape",
   };
+  // Shortcuts for testing easter eggs, only in the personal edition.
+  if (EDITION === "personal") Object.assign(KEYS, { v: "egg", V: "egg", p: "poison", P: "poison" });
   document.addEventListener("keydown", e => {
     const a = KEYS[e.key];
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -1471,6 +1691,7 @@
     });
   }
 
+  document.querySelectorAll("[data-art]").forEach(el => { el.innerHTML = pixelArt(ART[el.dataset.art]); });
   resetBoard();
   applyTheme();
   showMenu();
